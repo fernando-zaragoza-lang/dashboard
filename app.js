@@ -1101,7 +1101,7 @@ function renderUnitsByProductChart() {
 // ADVERTISING ATTRIBUTION ENGINE
 // ═══════════════════════════════════════════════════════════
 
-const SHEET_URL = 'https://corsproxy.io/?' + encodeURIComponent('https://docs.google.com/spreadsheets/d/e/2PACX-1vTcGM8DUSsRWHAvtFI7gOZ_k6tvOaT92EwhriZMA6g99Ch7UWmMo6gmeNLR7N-p4BYPR2f1CnFPEe2k/pubhtml');
+const SHEET_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTcGM8DUSsRWHAvtFI7gOZ_k6tvOaT92EwhriZMA6g99Ch7UWmMo6gmeNLR7N-p4BYPR2f1CnFPEe2k/pub?gid=540504181&single=true&output=csv';
 
 // Classify a product string into a broad service type
 function classifyProduct(productStr) {
@@ -1163,19 +1163,44 @@ function parseSheetDate(str) {
 
 // Fetch leads from Google Sheet and run attribution
 async function fetchAndRenderAttribution() {
+    console.log('--- Iniciando carga de Leads desde Google Sheets ---');
     const loadingEl = document.getElementById('pub-loading');
     if (loadingEl) loadingEl.classList.remove('hidden');
 
     try {
+        const fetchUrl = SHEET_URL + '&t=' + Date.now();
+        console.log('Intentando carga directa:', fetchUrl);
+
         await new Promise((resolve, reject) => {
-            Papa.parse(SHEET_URL, {
+            Papa.parse(fetchUrl, {
                 download: true,
-                header: true,
+                header: false, // Change to false to handle junk rows manually
                 skipEmptyLines: 'greedy',
                 complete(results) {
-                    STATE.rawLeadsData = results.data;
-                    STATE.leadsLoaded = true;
-                    resolve();
+                    if (results.data && results.data.length > 1) {
+                        // Find the header row (the one containing 'Nombre completo' or 'Marca temporal')
+                        let headerRowIndex = results.data.findIndex(row =>
+                            row.some(cell => String(cell).includes('Nombre completo') || String(cell).includes('Marca temporal'))
+                        );
+
+                        if (headerRowIndex === -1) headerRowIndex = 0; // fallback
+
+                        const headers = results.data[headerRowIndex];
+                        const rows = results.data.slice(headerRowIndex + 1).map(row => {
+                            const obj = {};
+                            headers.forEach((h, i) => {
+                                if (h) obj[h.trim()] = row[i];
+                            });
+                            return obj;
+                        });
+
+                        STATE.rawLeadsData = rows;
+                        STATE.leadsLoaded = true;
+                        console.log('✅ Leads cargados directamente:', rows.length, 'filas');
+                        resolve();
+                    } else {
+                        reject(new Error('Respuesta vacía de Google Sheets.'));
+                    }
                 },
                 error(err) { reject(err); }
             });
@@ -1183,8 +1208,28 @@ async function fetchAndRenderAttribution() {
 
         updatePublicityUI();
     } catch (err) {
-        console.error('Error fetching leads from Sheet:', err);
-        alert('No se pudo cargar el listado de leads desde Google Sheets. Comprueba que la hoja es pública.');
+        console.warn('Carga directa fallida, intentando con proxy...', err);
+        try {
+            const proxyUrl = 'https://api.allorigins.win/raw?url=' + encodeURIComponent(SHEET_URL);
+            await new Promise((resolve, reject) => {
+                Papa.parse(proxyUrl, {
+                    download: true,
+                    header: true,
+                    skipEmptyLines: 'greedy',
+                    complete(results) {
+                        STATE.rawLeadsData = results.data;
+                        STATE.leadsLoaded = true;
+                        console.log('✅ Leads cargados vía proxy');
+                        resolve();
+                    },
+                    error(err) { reject(err); }
+                });
+            });
+            updatePublicityUI();
+        } catch (proxyErr) {
+            console.error('Error total en la carga de leads:', proxyErr);
+            alert('No se pudo cargar el listado de leads desde Google Sheets.\n\nVerifica que en Google Sheets:\n1. Has ido a "Publicar en la web".\n2. Has seleccionado la pestaña correcta.\n3. El formato es CSV.');
+        }
     } finally {
         if (loadingEl) loadingEl.classList.add('hidden');
     }
@@ -1218,11 +1263,12 @@ function updatePublicityUI() {
     const tableRows = [];
 
     paidLeads.forEach(lead => {
-        const email = (lead['Email'] || '').trim().toLowerCase();
+        // Handle different possible column names for Email, Date, Name
+        const email = (lead['Correo electrónico'] || lead['Email'] || '').trim().toLowerCase();
         if (!email) return;
 
         const matchedSales = salesByEmail[email] || [];
-        const leadDate = parseSheetDate(lead['Fecha']);
+        const leadDate = parseSheetDate(lead['Fecha de compra'] || lead['Fecha'] || lead['Marca temporal']);
         if (!leadDate) return;
 
         if (matchedSales.length === 0) {
@@ -1284,9 +1330,9 @@ function updatePublicityUI() {
     tableRows.forEach(({ lead, sale, days, attr, model, saleAmount, isCrossSell, saleDate }) => {
         const tr = document.createElement('tr');
         tr.innerHTML = `
-            <td>${lead['Nombre'] || '-'}</td>
-            <td style="font-size:0.8rem">${(lead['Email'] || '-')}</td>
-            <td>${lead['Fecha'] || '-'}</td>
+            <td>${lead['Nombre completo'] || lead['Nombre'] || '-'}</td>
+            <td style="font-size:0.8rem">${(lead['Correo electrónico'] || lead['Email'] || '-')}</td>
+            <td>${lead['Fecha de compra'] || lead['Fecha'] || lead['Marca temporal'] || '-'}</td>
             <td>${lead['Producto'] || '-'}</td>
             <td>${saleDate ? saleDate.toLocaleDateString('es-ES') : '-'}</td>
             <td>${sale ? getProductStr(sale) : '-'}</td>
@@ -1335,4 +1381,3 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 });
-
