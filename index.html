@@ -336,6 +336,39 @@
 
             <!-- Students View removed as per user request -->
 
+            <!-- REGISTRO DE CAMBIOS VIEW -->
+            <div id="view-registro" class="view-section hidden">
+                <div class="table-container">
+                    <h3 style="display:flex; justify-content:space-between; align-items:center;">
+                        Registro de Modificaciones
+                        <div class="filter-group" style="font-size: 0.9rem; font-weight: normal; margin:0;">
+                            <label for="regYearFilter">Año:</label>
+                            <select id="regYearFilter" class="month-select" style="margin-right: 10px;">
+                                <option value="all">Todos</option>
+                            </select>
+                            <label for="regMonthFilter">Mes:</label>
+                            <select id="regMonthFilter" class="month-select">
+                                <option value="all">Todos los Meses</option>
+                            </select>
+                        </div>
+                    </h3>
+                    <div id="reg-loading" class="loading-spinner hidden" style="margin: 20px auto;"></div>
+                    <table class="data-table" id="registro-table">
+                        <thead>
+                            <tr>
+                                <th>Fecha Modificación</th>
+                                <th>Editor</th>
+                                <th>Cliente / ID Venta</th>
+                                <th>Cambios (Anterior ➜ Nuevo)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <!-- Populated by JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
         </main>
     </div>
 
