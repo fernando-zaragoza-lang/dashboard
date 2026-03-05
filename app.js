@@ -237,7 +237,11 @@ function initNavigation() {
             const dateVal = document.getElementById('sale-date').value;
             const vendorVal = document.getElementById('sale-vendor').value;
             const clientVal = document.getElementById('sale-client').value;
-            const productVal = document.getElementById('sale-product').value;
+
+            // Gather checked products
+            const checkedProducts = Array.from(document.querySelectorAll('input[name="product-option"]:checked')).map(cb => cb.value);
+            const productVal = checkedProducts.join(', ');
+
             const amountVal = document.getElementById('sale-amount').value;
             const renewalVal = document.getElementById('sale-renewal').value;
             const countryVal = document.getElementById('sale-country').value;
@@ -377,7 +381,17 @@ window.openEditModal = function (id) {
     setSelectSafe('sale-vendor', row['Vendedor']);
     document.getElementById('sale-client').value = row['Nombre completo'] || row['Nombre de cliente'] || '';
     if (document.getElementById('sale-email')) document.getElementById('sale-email').value = row['Email'] || row['Correo Electrónico'] || '';
-    document.getElementById('sale-product').value = row['Qué compra?'] || row['Producto'] || '';
+
+    // Check corresponding product checkboxes
+    const productListStr = row['Qué compra?'] || row['Producto'] || '';
+    const productCheckboxes = document.querySelectorAll('input[name="product-option"]');
+    productCheckboxes.forEach(cb => {
+        if (productListStr.toLowerCase().includes(cb.value.toLowerCase())) {
+            cb.checked = true;
+        } else {
+            cb.checked = false;
+        }
+    });
 
     // Parse amount back to native number float
     let valStr = row['Valor de compra TOTAL (independientemente de que pague mensual)'] || row['Ticket total'] || '0';

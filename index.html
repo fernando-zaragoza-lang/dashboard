@@ -180,15 +180,34 @@
                                     <label>Nombre y Apellidos del Cliente</label>
                                     <input type="text" id="sale-client" placeholder="Ej. Juan Pérez" required>
                                 </div>
-                                <div class="input-group">
-                                    <label>Producto o Servicio</label>
-                                    <input type="text" id="sale-product" placeholder="Ej. Método SAS"
-                                        list="products-list" required>
-                                    <datalist id="products-list">
-                                        <option value="Método SAS / SAS Method">
-                                        <option value="Peer to peer IT">
-                                        <option value="Suscripción Mensual">
-                                    </datalist>
+                                <div class="input-group full-width">
+                                    <label>Producto o Servicio (Puedes marcar varios)</label>
+                                    <div class="checkbox-grid" id="sale-product-grid"
+                                        style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; background-color: rgba(30, 25, 70, 0.5); padding: 15px; border-radius: var(--radius-sm); border: 1px solid var(--border);">
+                                        <label><input type="checkbox" name="product-option" value="SAS Meeting IT"> SAS
+                                            Meeting IT</label>
+                                        <label><input type="checkbox" name="product-option" value="SAS Meeting Madrid">
+                                            SAS Meeting Madrid</label>
+                                        <label><input type="checkbox" name="product-option" value="Sun&Fun">
+                                            Sun&Fun</label>
+                                        <label><input type="checkbox" name="product-option"
+                                                value="Método SAS/SAS Method"> Método SAS / SAS Method</label>
+                                        <label><input type="checkbox" name="product-option" value="Peer to peer IT">
+                                            Peer to peer IT</label>
+                                        <label><input type="checkbox" name="product-option"
+                                                value="Biomecánica / Método Regular / Regular Method"> Biomecánica /
+                                            Regular Method</label>
+                                        <label><input type="checkbox" name="product-option" value="TPS"> TPS</label>
+                                        <label><input type="checkbox" name="product-option"
+                                                value="Allineatori e Biomeccanica"> Allineatori e Biomeccanica</label>
+                                        <label><input type="checkbox" name="product-option" value="RNO"> RNO</label>
+                                        <label><input type="checkbox" name="product-option" value="In-office">
+                                            In-office</label>
+                                        <label><input type="checkbox" name="product-option" value="Pack Sesiones 1:1">
+                                            Pack Sesiones 1:1</label>
+                                        <label><input type="checkbox" name="product-option" value="SAS Club"> SAS
+                                            Club</label>
+                                    </div>
                                 </div>
                                 <div class="input-group">
                                     <label>Importe Cobrado (€)</label>
