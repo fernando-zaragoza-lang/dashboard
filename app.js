@@ -255,21 +255,38 @@ function initNavigation() {
                 const emailVal = (document.getElementById('sale-email') || {}).value || '';
                 const editId = document.getElementById('edit-sale-id').value;
 
-                const newRowData = {
-                    'Marca temporal': formattedDate,
-                    'Vendedor': vendorVal,
-                    'Nombre completo': clientVal,
-                    'Email': emailVal.trim().toLowerCase(),
-                    'Qué compra?': productVal,
-                    'Valor de compra TOTAL (independientemente de que pague mensual)': formattedAmount,
-                    'Renovación': renewalVal,
-                    'País': countryVal,
-                    'Forma de pago': paymentVal,
-                    'Promesa': promiseVal
-                };
-
                 if (editId) {
-                    // Updating an existing sale
+                    // Updating an existing sale - fetch original row to merge and not lose data
+                    const oldRow = STATE.rawNuevosData.find(r => String(r.id) === String(editId)) || {};
+
+                    const newRowData = { ...oldRow };
+
+                    // Carefully map the UI over the existing keys
+                    if ('Marca temporal' in newRowData) newRowData['Marca temporal'] = formattedDate;
+                    if ('Fecha de compra' in newRowData) newRowData['Fecha de compra'] = formattedDate;
+
+                    if ('Vendedor' in newRowData) newRowData['Vendedor'] = vendorVal;
+
+                    if ('Nombre completo' in newRowData) newRowData['Nombre completo'] = clientVal;
+                    if ('Nombre de cliente' in newRowData) newRowData['Nombre de cliente'] = clientVal;
+
+                    if ('Email' in newRowData) newRowData['Email'] = emailVal.trim().toLowerCase();
+                    if ('Correo Electrónico' in newRowData) newRowData['Correo Electrónico'] = emailVal.trim().toLowerCase();
+
+                    if ('Qué compra?' in newRowData) newRowData['Qué compra?'] = productVal;
+                    if ('Producto' in newRowData) newRowData['Producto'] = productVal;
+
+                    if ('Valor de compra TOTAL (independientemente de que pague mensual)' in newRowData) {
+                        newRowData['Valor de compra TOTAL (independientemente de que pague mensual)'] = formattedAmount;
+                    }
+                    if ('Ticket total' in newRowData) newRowData['Ticket total'] = formattedAmount;
+
+                    if ('Renovación' in newRowData) newRowData['Renovación'] = renewalVal;
+                    if ('País' in newRowData) newRowData['País'] = countryVal;
+                    if ('Forma de pago' in newRowData) newRowData['Forma de pago'] = paymentVal;
+                    if ('Promesa' in newRowData) newRowData['Promesa'] = promiseVal;
+
+                    // Execute update
                     const { error } = await supabaseClient
                         .from('ventas')
                         .update(newRowData)
@@ -277,7 +294,6 @@ function initNavigation() {
                     if (error) throw error;
 
                     // Log the edit
-                    const oldRow = STATE.rawNuevosData.find(r => r.id === editId) || {};
                     await supabaseClient.from('ventas_logs').insert([{
                         venta_id: editId.toString(),
                         usuario_editor: STATE.currentUserDisplay || STATE.currentUserEmail,
@@ -288,6 +304,19 @@ function initNavigation() {
 
                 } else {
                     // Inserting new sale
+                    const newRowData = {
+                        'Marca temporal': formattedDate,
+                        'Vendedor': vendorVal,
+                        'Nombre completo': clientVal,
+                        'Email': emailVal.trim().toLowerCase(),
+                        'Qué compra?': productVal,
+                        'Valor de compra TOTAL (independientemente de que pague mensual)': formattedAmount,
+                        'Renovación': renewalVal,
+                        'País': countryVal,
+                        'Forma de pago': paymentVal,
+                        'Promesa': promiseVal
+                    };
+
                     const { error } = await supabaseClient
                         .from('ventas')
                         .insert([newRowData]);
