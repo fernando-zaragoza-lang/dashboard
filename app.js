@@ -245,6 +245,7 @@ function initNavigation() {
             const amountVal = document.getElementById('sale-amount').value;
             const renewalVal = document.getElementById('sale-renewal').value;
             const countryVal = document.getElementById('sale-country').value;
+            const languageVal = document.getElementById('sale-language') ? document.getElementById('sale-language').value : '';
             const paymentVal = document.getElementById('sale-payment-method').value;
             const promiseVal = document.getElementById('sale-promise').value;
 
@@ -286,16 +287,27 @@ function initNavigation() {
                     if ('Ticket total' in newRowData) newRowData['Ticket total'] = formattedAmount;
 
                     if ('Renovación' in newRowData) newRowData['Renovación'] = renewalVal;
+                    if ('Es una renovación?' in newRowData) newRowData['Es una renovación?'] = renewalVal;
+
                     if ('País' in newRowData) newRowData['País'] = countryVal;
+                    if ('En qué país vive?' in newRowData) newRowData['En qué país vive?'] = countryVal;
+
                     if ('Forma de pago' in newRowData) newRowData['Forma de pago'] = paymentVal;
+
+                    if ('Qué se le promete al cliente' in newRowData) newRowData['Qué se le promete al cliente'] = promiseVal;
                     if ('Promesa' in newRowData) newRowData['Promesa'] = promiseVal;
+
+                    newRowData['Idioma'] = languageVal;
 
                     // Execute update
                     const { error } = await supabaseClient
                         .from('ventas')
                         .update(newRowData)
                         .eq('id', editId);
-                    if (error) throw error;
+                    if (error) {
+                        console.error("Update Error:", error);
+                        throw error;
+                    }
 
                     // Log the edit
                     await supabaseClient.from('ventas_logs').insert([{
@@ -307,7 +319,7 @@ function initNavigation() {
                     alert('Operación actualizada correctamente.');
 
                 } else {
-                    // Inserting new sale
+                    // Inserting new sale - use exact DB column names
                     const newRowData = {
                         'Marca temporal': formattedDate,
                         'Vendedor': vendorVal,
@@ -315,16 +327,20 @@ function initNavigation() {
                         'Email': emailVal.trim().toLowerCase(),
                         'Qué compra?': productVal,
                         'Valor de compra TOTAL (independientemente de que pague mensual)': formattedAmount,
-                        'Renovación': renewalVal,
-                        'País': countryVal,
+                        'Es una renovación?': renewalVal,
+                        'En qué país vive?': countryVal,
+                        'Idioma': languageVal,
                         'Forma de pago': paymentVal,
-                        'Promesa': promiseVal
+                        'Qué se le promete al cliente': promiseVal
                     };
 
                     const { error } = await supabaseClient
                         .from('ventas')
                         .insert([newRowData]);
-                    if (error) throw error;
+                    if (error) {
+                        console.error('Insert Error:', error);
+                        throw error;
+                    }
                     alert('Operación guardada correctamente.');
                 }
 
@@ -398,10 +414,11 @@ window.openEditModal = function (id) {
     valStr = valStr.replace('€', '').trim().replace(',', '.');
     document.getElementById('sale-amount').value = parseFloat(valStr) || 0;
 
-    setSelectSafe('sale-renewal', row['Renovación']);
-    document.getElementById('sale-country').value = row['País'] || '';
+    setSelectSafe('sale-renewal', row['Renovación'] || row['Es una renovación?']);
+    setSelectSafe('sale-country', row['País'] || row['En qué país vive?']);
+    setSelectSafe('sale-language', row['Idioma']);
     setSelectSafe('sale-payment-method', row['Forma de pago']);
-    document.getElementById('sale-promise').value = row['Promesa'] || '';
+    document.getElementById('sale-promise').value = row['Promesa'] || row['Qué se le promete al cliente'] || '';
 
     document.getElementById('new-sale-modal').classList.remove('hidden');
 };
