@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <title>SAS - Importador CSV → Supabase</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 700px;
+            margin: 60px auto;
+            padding: 20px;
+            background: #0f0c24;
+            color: #e2e8f0;
+        }
+
+        h1 {
+            color: #9b7bf7;
+        }
+
+        .card {
+            background: #1a1535;
+            border: 1px solid #2d2a4a;
+            border-radius: 12px;
+            padding: 30px;
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 10px;
+            color: #a0aec0;
+        }
+
+        input[type=file] {
+            width: 100%;
+            padding: 12px;
+            background: #2d2a4a;
+            border: 1px dashed #9b7bf7;
+            border-radius: 8px;
+            color: #e2e8f0;
+            cursor: pointer;
+            margin-bottom: 20px;
+        }
+
+        button {
+            background: linear-gradient(135deg, #9b7bf7, #e2b464);
+            color: white;
+            border: none;
+            padding: 14px 28px;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            width: 100%;
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        #log {
+            background: #0a0819;
+            border-radius: 8px;
+            padding: 16px;
+            font-family: monospace;
+            font-size: 0.85rem;
+            white-space: pre-wrap;
+            max-height: 400px;
+            overflow-y: auto;
+            border: 1px solid #2d2a4a;
+        }
+
+        .ok {
+            color: #2dd4bf;
+        }
+
+        .err {
+            color: #fc8181;
+        }
+
+        .info {
+            color: #f6e05e;
+        }
+
+        progress {
+            width: 100%;
+            height: 12px;
+            margin: 10px 0;
+            border-radius: 6px;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>📥 Importador CSV → Supabase</h1>
+    <p style="color:#a0aec0">Usa esta herramienta UNA SOLA VEZ para cargar el historial en la base de datos.</p>
+
+    <div class="card">
+        <label>1. Selecciona el archivo CSV de Nuevos:</label>
+        <input type="file" id="csvFile" accept=".csv">
+
+        <label id="previewLabel" style="display:none">2. Vista previa (primeras 3 filas) — comprueba que las columnas
+            son correctas:</label>
+        <div id="preview" style="overflow-x:auto; margin-bottom:16px;"></div>
+
+        <button id="btnImport" disabled>🚀 Importar a Supabase</button>
+        <progress id="prog" value="0" max="100" style="display:none"></progress>
+    </div>
+
+    <div class="card">
+        <div id="log">Esperando archivo CSV...</div>
+    </div>
+
+    <script>
+        const SUPABASE_URL = 'https://vbbirpbauowtipmugayq.supabase.co';
+        const SUPABASE_KEY = 'sb_publishable_-d2OZVqMzbK_1uZ1sw6JAA_Q2nLMJX9';
+        const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+        const logEl = document.getElementById('log');
+        const progEl = document.getElementById('prog');
+        const btnImp = document.getElementById('btnImport');
+        const preview = document.getElementById('preview');
+
+        let parsedRows = [];
+
+        function log(msg, type = 'info') {
+            const span = document.createElement('span');
+            span.className = type;
+            span.textContent = msg + '\n';
+            logEl.appendChild(span);
+            logEl.scrollTop = logEl.scrollHeight;
+        }
+
+        function clearLog() { logEl.innerHTML = ''; }
+
+        // ── Map a CSV row to a Supabase row ─────────────────────────────
+        // The CSV from Google Forms has these columns (adapt if yours differ):
+        //   Marca temporal | Vendedor | Nombre completo | Qué compra? | Valor de compra TOTAL ...
+        // We store them in Supabase under the exact same column names.
+        function mapRow(row) {
+            // Try multiple possible header names for robustness
+            const fecha = row['Marca temporal'] || row['Fecha de compra'] || row['Timestamp'] || '';
+            const vendor = row['Vendedor'] || row['vendedor'] || '';
+            const client = row['Nombre completo'] || row['Nombre'] || row['nombre completo'] || '';
+            const product = row['Qué compra?'] || row['Que compra?'] || row['Producto'] || row['producto'] || row['What are you buying?'] || '';
+
+            // 4 New Fields
+            const renewal = row['Es una renovación?'] || row['Renovación'] || 'No';
+            const country = row['En qué país vive?'] || row['País'] || '';
+            const promise = row['Qué se le promete al cliente'] || row['Promesa'] || '';
+            const payment = row['Forma de pago'] || row['Método de pago'] || '';
+
+            // Email: try several typical Google Forms column headers
+            let email = '';
+            for (const key of Object.keys(row)) {
+                const kl = key.toLowerCase();
+                if (kl.includes('email') || kl.includes('correo') || kl.includes('e-mail')) {
+                    email = row[key];
+                    break;
+                }
+            }
+
+            // Amount: prioritize 'Ticket total' or 'Valor'
+            let amount = row['Ticket total'] || '';
+            if (!amount) {
+                for (const key of Object.keys(row)) {
+                    const kl = key.toLowerCase();
+                    if (kl.includes('valor') || kl.includes('total') || kl.includes('importe')) {
+                        amount = row[key];
+                        break;
+                    }
+                }
+            }
+
+            return {
+                'Marca temporal': fecha,
+                'Vendedor': vendor,
+                'Nombre completo': client,
+                'Email': email.trim().toLowerCase(),
+                'Qué compra?': product,
+                'Valor de compra TOTAL (independientemente de que pague mensual)': amount,
+                'Renovación': renewal,
+                'País': country,
+                'Promesa': promise,
+                'Forma de pago': payment
+            };
+        }
+
+        // ── File selection ───────────────────────────────────────────────
+        document.getElementById('csvFile').addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            clearLog();
+            log(`Leyendo "${file.name}"...`);
+
+            // Use header:false initially to find the real header row manually
+            Papa.parse(file, {
+                header: false,
+                skipEmptyLines: 'greedy',
+                complete(results) {
+                    const rawData = results.data;
+                    let headerIdx = -1;
+
+                    // Scan first 15 rows for typical header keywords
+                    for (let i = 0; i < Math.min(15, rawData.length); i++) {
+                        const row = rawData[i];
+                        if (row.some(cell => typeof cell === 'string' && (cell.includes('Marca temporal') || cell.includes('Valor de compra TOTAL')))) {
+                            headerIdx = i;
+                            break;
+                        }
+                    }
+
+                    if (headerIdx === -1) {
+                        log(`❌ No se encontró la fila de cabecera (Marca temporal).`, 'err');
+                        return;
+                    }
+
+                    const headers = rawData[headerIdx].map(h => (h || '').trim());
+                    parsedRows = [];
+
+                    for (let i = headerIdx + 1; i < rawData.length; i++) {
+                        const rowArr = rawData[i];
+                        if (!rowArr.some(cell => cell && String(cell).trim() !== '')) continue; // Skip truly empty lines
+
+                        const rowObj = {};
+                        headers.forEach((h, idx) => {
+                            const key = h || `Columna_${idx}`;
+                            rowObj[key] = rowArr[idx] || '';
+                        });
+                        parsedRows.push(rowObj);
+                    }
+
+                    log(`✅ ${parsedRows.length} filas encontradas (cabecera en fila ${headerIdx + 1}).`, 'ok');
+                    log(`Columnas detectadas: ${headers.filter(h => h).join(' | ')}`);
+
+                    // Preview first 3 rows
+                    const sample = parsedRows.slice(0, 3);
+                    const fields = headers.filter(h => h);
+                    let html = '<table style="border-collapse:collapse;font-size:0.78rem;width:100%">';
+                    html += '<tr>' + fields.map(f => `<th style="border:1px solid #2d2a4a;padding:4px 8px;background:#2d2a4a;color:#9b7bf7">${f}</th>`).join('') + '</tr>';
+                    sample.forEach(r => {
+                        html += '<tr>' + fields.map(f => `<td style="border:1px solid #2d2a4a;padding:4px 8px;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${r[f] || ''}">${r[f] || ''}</td>`).join('') + '</tr>';
+                    });
+                    html += '</table>';
+                    preview.innerHTML = html;
+                    document.getElementById('previewLabel').style.display = 'block';
+
+                    btnImp.disabled = false;
+                },
+                error(err) {
+                    log(`❌ Error al leer el CSV: ${err.message}`, 'err');
+                }
+            });
+        });
+
+        async function sniffSchema() {
+            log("Conectando con Supabase para verificar columnas...");
+            const { data, error } = await db.from('ventas').select('*').limit(1);
+            if (error) {
+                log(`❌ Error al conectar: ${error.message}`, 'err');
+                return null;
+            }
+            if (!data || data.length === 0) {
+                log("⚠️ La tabla está vacía o no se puede leer. Usando nombres por defecto.");
+                return null;
+            }
+            const keys = Object.keys(data[0]);
+            log(`✅ Columnas detectadas en Supabase: ${keys.join(', ')}`, 'ok');
+            return keys;
+        }
+
+        // ── Import button ────────────────────────────────────────────────
+        btnImp.addEventListener('click', async () => {
+            if (!parsedRows.length) return;
+
+            btnImp.disabled = true;
+            progEl.style.display = 'block';
+            clearLog();
+            log(`🚀 Iniciando importación de ${parsedRows.length} filas...`);
+
+            // Phase 1: Sniff the actual schema to avoid "Could not find column" errors
+            let dbColumns = await sniffSchema();
+
+            const BATCH = 50;
+            let success = 0;
+            let failed = 0;
+            const blacklistedColumns = new Set();
+
+            for (let i = 0; i < parsedRows.length; i += BATCH) {
+                const rawChunk = parsedRows.slice(i, i + BATCH);
+                let retry = true;
+
+                while (retry) {
+                    retry = false;
+
+                    // Map each row and filter by database columns AND blacklist
+                    const chunk = rawChunk.map(row => {
+                        const baseMap = mapRow(row);
+                        const finalRow = {};
+
+                        // Use sniffed columns if available, otherwise use everything from baseMap
+                        const targetKeys = dbColumns ? dbColumns : Object.keys(baseMap);
+
+                        for (const dbKey of targetKeys) {
+                            if (blacklistedColumns.has(dbKey)) continue;
+
+                            // 1. Direct match
+                            if (baseMap[dbKey] !== undefined) {
+                                finalRow[dbKey] = baseMap[dbKey];
+                                continue;
+                            }
+
+                            // 2. Fuzzy match (only if we have dbColumns)
+                            if (dbColumns) {
+                                const dbKeyClean = dbKey.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+                                const foundKey = Object.keys(baseMap).find(k => {
+                                    const kClean = k.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+                                    return kClean === dbKeyClean || kClean.includes(dbKeyClean) || dbKeyClean.includes(kClean);
+                                });
+
+                                if (foundKey) {
+                                    finalRow[dbKey] = baseMap[foundKey];
+                                }
+                            }
+                        }
+                        return finalRow;
+                    });
+
+                    const { error } = await db.from('ventas').insert(chunk);
+
+                    if (error) {
+                        // Check if it's a "Column not found" error (Case insensitive and handles different message formats)
+                        const msg = error.message || "";
+                        const colMatch = msg.match(/column "(.+?)" of/i) ||
+                            msg.match(/column '(.+?)' of/i) ||
+                            msg.match(/Could not find the '(.+?)' column/i) ||
+                            msg.match(/Could not find the "(.+?)" column/i);
+
+                        if (colMatch && colMatch[1]) {
+                            const missingCol = colMatch[1];
+                            log(`⚠️ La columna "${missingCol}" no existe en tu Supabase. Saltándola...`, 'info');
+                            blacklistedColumns.add(missingCol);
+                            retry = true; // Try the same batch again without this column
+                        } else {
+                            log(`❌ Error en filas ${i + 1}-${Math.min(i + BATCH, parsedRows.length)}: ${error.message}`, 'err');
+                            failed += rawChunk.length;
+                        }
+                    } else {
+                        success += rawChunk.length;
+                        log(`✅ Filas ${i + 1}-${Math.min(i + BATCH, parsedRows.length)} importadas`, 'ok');
+                    }
+                }
+
+                progEl.value = Math.round(((i + BATCH) / parsedRows.length) * 100);
+            }
+
+            progEl.value = 100;
+            log('');
+            log(`═══════════════════════════════`, 'info');
+            log(`✅ Éxito: ${success} filas`, 'ok');
+            if (failed) log(`❌ Fallidas: ${failed} filas`, 'err');
+            if (blacklistedColumns.size > 0) {
+                log(`⚠️ Columnas ignoradas (no existen en la DB): ${Array.from(blacklistedColumns).join(', ')}`, 'info');
+                log(`💡 Consejo: Crea estas columnas en el panel de Supabase si quieres que se guarden.`, 'info');
+            }
+            log(`═══════════════════════════════`, 'info');
+            log(`¡Listo! Ahora abre index.html y refresca los datos.`, 'ok');
+
+            btnImp.disabled = false;
+        });
+    </script>
+</body>
+
+</html>

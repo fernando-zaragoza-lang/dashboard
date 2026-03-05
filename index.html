@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SAS Academy Dashboard</title>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- PapaParse -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+    <!-- Supabase -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+    <script>
+        // Password protection check
+        if (localStorage.getItem('sas_auth') !== 'true') {
+            window.location.href = 'login.html';
+        }
+    </script>
+    <div class="app-container">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <img src="descarga.jpg" alt="SAS Academy Logo" class="sidebar-logo">
+            </div>
+            <nav class="sidebar-nav">
+                <ul>
+                    <li class="active"><a href="#dashboard" id="nav-dashboard"><i>📊</i> Resumen</a></li>
+                    <li><a href="#vendors" id="nav-vendors"><i>👤</i> Vendedores</a></li>
+                    <li><a href="#publicity" id="nav-publicity"><i>📣</i> Publicidad</a></li>
+                    <li><a href="#" id="nav-logout" style="color: #ef4444; margin-top: 20px;"><i>🚪</i> Cerrar
+                            Sesión</a></li>
+                </ul>
+            </nav>
+            <div class="file-upload-container" id="sync-container">
+                <p style="text-align: center; font-weight: 600; margin-bottom: 5px;">☁️ Conectado a la Nube</p>
+                <p style="text-align: center; font-size: 0.8rem; color: var(--text-muted); margin-bottom: 15px;">
+                    Sincronización automática activa</p>
+                <button id="btn-sync" class="action-btn" style="width: 100%; justify-content: center; padding: 12px;">
+                    <i>🔄</i> Refrescar Datos
+                </button>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <header class="topbar">
+                <h1>Dashboard de Rendimiento 2025</h1>
+                <div class="filter-group">
+                    <label for="monthFilter">Filtrar por Mes:</label>
+                    <select id="monthFilter" class="month-select">
+                        <option value="all">Todos los Meses</option>
+                    </select>
+                </div>
+            </header>
+
+            <div id="loading" class="loading-overlay hidden">
+                <div class="spinner"></div>
+                <p>Cargando datos...</p>
+            </div>
+
+            <div id="error-message" class="error-banner hidden"></div>
+
+            <div id="view-dashboard" class="view-section active">
+                <div class="kpi-grid">
+                    <div class="kpi-card">
+                        <h3>Ventas Totales</h3>
+                        <div class="kpi-value" id="kpi-total-sales">0 €</div>
+                        <div class="kpi-trend positive">General</div>
+                    </div>
+                    <div class="kpi-card">
+                        <h3>Total Unidades</h3>
+                        <div class="kpi-value" id="kpi-total-units">0</div>
+                        <div class="kpi-trend positive">Productos</div>
+                    </div>
+                    <div class="kpi-card">
+                        <h3>Alumnos Activos</h3>
+                        <div class="kpi-value" id="kpi-active-students">0</div>
+                        <div class="kpi-trend neutral">En Vigor</div>
+                    </div>
+                    <div class="kpi-card">
+                        <h3>Tasa de Renovación</h3>
+                        <div class="kpi-value" id="kpi-renewal-rate">0%</div>
+                        <div class="kpi-trend neutral" id="kpi-renewal-info">0 Sí / 0 No</div>
+                    </div>
+                </div>
+
+                <div class="charts-container">
+                    <!-- Sales by Month -->
+                    <div class="chart-card full-width">
+                        <h3>Evolución de Ventas por Mes</h3>
+                        <div class="chart-wrapper">
+                            <canvas id="salesByMonthChart"></canvas>
+                        </div>
+                    </div>
+
+                    <!-- Sales by Seller -->
+                    <div class="chart-card half-width">
+                        <h3>Ventas por Vendedor</h3>
+                        <div class="chart-wrapper">
+                            <canvas id="salesBySellerChart"></canvas>
+                        </div>
+                    </div>
+
+                    <!-- Units by Product -->
+                    <div class="chart-card half-width">
+                        <h3>Unidades Vendidas por Producto</h3>
+                        <div class="chart-wrapper">
+                            <canvas id="unitsByProductChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Vendedores View -->
+            <div id="view-vendors" class="view-section hidden">
+                <header class="topbar-secondary">
+                    <div class="filter-group">
+                        <label for="vendorFilter">Seleccionar Vendedor:</label>
+                        <select id="vendorFilter" class="month-select">
+                            <option value="none">Seleccione Vendedor</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label for="cycleFilter">Ciclo Comercial (Cierra el 24):</label>
+                        <select id="cycleFilter" class="month-select">
+                            <option value="all">Todos los Ciclos</option>
+                        </select>
+                    </div>
+                    <div style="flex: 1;"></div>
+                    <button class="action-btn" id="btn-add-sale">
+                        <i>➕</i> Añadir Operación
+                    </button>
+                </header>
+
+                <div id="new-sale-modal" class="modal-overlay hidden">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h3>Registrar Nueva Operación</h3>
+                            <button class="close-modal" id="btn-close-sale">×</button>
+                        </div>
+                        <form id="new-sale-form" class="sale-form">
+                            <div class="form-grid">
+                                <div class="input-group">
+                                    <label>Fecha de Venta (y Hora)</label>
+                                    <input type="datetime-local" id="sale-date" required>
+                                </div>
+                                <div class="input-group">
+                                    <label>Vendedor</label>
+                                    <select id="sale-vendor" required>
+                                        <option value="">Seleccione Vendedor</option>
+                                        <option value="Fer">Fer</option>
+                                        <option value="Josema">Josema</option>
+                                        <option value="Álvaro">Álvaro</option>
+                                        <option value="Javi">Javi</option>
+                                        <option value="Publicidad">Publicidad</option>
+                                        <option value="Campaña">Campaña</option>
+                                        <option value="Otros">Otros</option>
+                                    </select>
+                                </div>
+                                <div class="input-group full-width">
+                                    <label>Email del Cliente</label>
+                                    <input type="email" id="sale-email" placeholder="Ej. juanperez@gmail.com">
+                                </div>
+                                <div class="input-group full-width">
+                                    <label>Nombre y Apellidos del Cliente</label>
+                                    <input type="text" id="sale-client" placeholder="Ej. Juan Pérez" required>
+                                </div>
+                                <div class="input-group">
+                                    <label>Producto o Servicio</label>
+                                    <input type="text" id="sale-product" placeholder="Ej. Método SAS"
+                                        list="products-list" required>
+                                    <datalist id="products-list">
+                                        <option value="Método SAS / SAS Method">
+                                        <option value="Peer to peer IT">
+                                        <option value="Suscripción Mensual">
+                                    </datalist>
+                                </div>
+                                <div class="input-group">
+                                    <label>Importe Cobrado (€)</label>
+                                    <input type="number" id="sale-amount" step="0.01" placeholder="Ej. 14.99" required>
+                                </div>
+                                <div class="input-group">
+                                    <label>Es una renovación?</label>
+                                    <select id="sale-renewal">
+                                        <option value="No">No</option>
+                                        <option value="Sí">Sí</option>
+                                    </select>
+                                </div>
+                                <div class="input-group">
+                                    <label>En qué país vive?</label>
+                                    <input type="text" id="sale-country" placeholder="Ej. España">
+                                </div>
+                                <div class="input-group">
+                                    <label>Forma de pago</label>
+                                    <select id="sale-payment-method">
+                                        <option value="Transferencia">Transferencia</option>
+                                        <option value="Kajabi">Kajabi</option>
+                                        <option value="Stripe">Stripe</option>
+                                    </select>
+                                </div>
+                                <div class="input-group full-width">
+                                    <label>Qué se le promete al cliente (Anotaciones)</label>
+                                    <textarea id="sale-promise" rows="3"
+                                        placeholder="Ej. Acceso a plataforma hasta 2027..."
+                                        style="background-color: rgba(30, 25, 70, 0.5); border: 1px solid var(--border); color: var(--text-main); padding: 12px 15px; border-radius: var(--radius-sm); font-family: inherit; font-size: 0.95rem;"></textarea>
+                                </div>
+                            </div>
+                            <button type="submit" class="submit-btn" id="btn-submit-sale">Guardar Operación</button>
+                        </form>
+                    </div>
+                </div>
+
+                <div class="kpi-grid">
+                    <div class="kpi-card">
+                        <h3>Ventas Vendedor (Ciclo)</h3>
+                        <div class="kpi-value" id="kpi-vendor-sales">0 €</div>
+                        <div class="kpi-trend positive" id="kpi-vendor-info">0 Operaciones</div>
+                    </div>
+                    <div class="kpi-card">
+                        <h3>Método SAS / SAS Method</h3>
+                        <div class="kpi-value" id="kpi-vendor-metodo">0</div>
+                        <div class="kpi-trend neutral">Unidades vendidas</div>
+                    </div>
+                </div>
+
+                <div class="table-container">
+                    <h3>Desglose de Operaciones del Ciclo</h3>
+                    <table class="data-table" id="vendor-sales-table">
+                        <thead>
+                            <tr>
+                                <th>Fecha Compra</th>
+                                <th>Cliente</th>
+                                <th>Producto</th>
+                                <th>Importe</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <!-- Populated by JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Publicidad / Attribution View -->
+            <div id="view-publicity" class="view-section hidden">
+                <header class="topbar-secondary">
+                    <div class="filter-group">
+                        <label for="pubMonthFilter">Filtrar por Mes:</label>
+                        <select id="pubMonthFilter" class="month-select">
+                            <option value="all">Todos los Meses</option>
+                        </select>
+                    </div>
+                    <div style="flex:1;"></div>
+                    <button class="action-btn" id="btn-refresh-pub">
+                        <i>🔄</i> Actualizar Leads
+                    </button>
+                </header>
+
+                <div id="pub-loading" class="hidden"
+                    style="text-align:center; padding: 30px; color: var(--text-muted);">
+                    <p>⏳ Cargando leads desde Google Sheet...</p>
+                </div>
+
+                <!-- Attribution KPIs -->
+                <div class="kpi-grid" id="pub-kpi-grid">
+                    <div class="kpi-card">
+                        <h3>Leads Totales</h3>
+                        <div class="kpi-value" id="kpi-pub-leads">0</div>
+                        <div class="kpi-trend neutral">Importados del Sheet</div>
+                    </div>
+                    <div class="kpi-card">
+                        <h3>Leads de Publicidad</h3>
+                        <div class="kpi-value" id="kpi-pub-paid">0</div>
+                        <div class="kpi-trend neutral">Con tag Publicidad</div>
+                    </div>
+                    <div class="kpi-card">
+                        <h3>Ventas Atribuidas</h3>
+                        <div class="kpi-value" id="kpi-pub-conversions">0</div>
+                        <div class="kpi-trend positive">Leads que compraron</div>
+                    </div>
+                    <div class="kpi-card">
+                        <h3>Atribución Total</h3>
+                        <div class="kpi-value" id="kpi-pub-attribution">0 €</div>
+                        <div class="kpi-trend positive">Valor atribuido</div>
+                    </div>
+                </div>
+
+                <!-- Attribution Table -->
+                <div class="table-container">
+                    <h3>Detalle de Atribución por Lead</h3>
+                    <table class="data-table" id="pub-attribution-table">
+                        <thead>
+                            <tr>
+                                <th>Nombre</th>
+                                <th>Email</th>
+                                <th>Fecha Entrada</th>
+                                <th>Servicio Entrada</th>
+                                <th>Fecha Compra</th>
+                                <th>Servicio Comprado</th>
+                                <th>Días</th>
+                                <th>Valor Compra</th>
+                                <th>Modelo</th>
+                                <th>Atribución €</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <!-- Populated by JS -->
+                        </tbody>
+                    </table>
+                    <p id="pub-no-data" class="hidden"
+                        style="text-align:center; color: var(--text-muted); padding: 30px;">
+                        No se han encontrado leads de publicidad con ventas asociadas en este período.
+                    </p>
+                </div>
+            </div>
+
+            <!-- Students View removed as per user request -->
+
+        </main>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+
+</html>
