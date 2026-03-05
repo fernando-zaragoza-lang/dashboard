@@ -53,7 +53,11 @@
             <header class="topbar">
                 <h1>Dashboard de Rendimiento 2025</h1>
                 <div class="filter-group">
-                    <label for="monthFilter">Filtrar por Mes:</label>
+                    <label for="yearFilter">Año:</label>
+                    <select id="yearFilter" class="month-select" style="margin-right: 10px;">
+                        <option value="all">Todos</option>
+                    </select>
+                    <label for="monthFilter">Mes:</label>
                     <select id="monthFilter" class="month-select">
                         <option value="all">Todos los Meses</option>
                     </select>
@@ -252,7 +256,11 @@
             <div id="view-publicity" class="view-section hidden">
                 <header class="topbar-secondary">
                     <div class="filter-group">
-                        <label for="pubMonthFilter">Filtrar por Mes:</label>
+                        <label for="pubYearFilter">Año:</label>
+                        <select id="pubYearFilter" class="month-select" style="margin-right: 10px;">
+                            <option value="all">Todos</option>
+                        </select>
+                        <label for="pubMonthFilter">Mes:</label>
                         <select id="pubMonthFilter" class="month-select">
                             <option value="all">Todos los Meses</option>
                         </select>
