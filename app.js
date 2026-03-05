@@ -1101,7 +1101,7 @@ function renderUnitsByProductChart() {
 // ADVERTISING ATTRIBUTION ENGINE
 // ═══════════════════════════════════════════════════════════
 
-const SHEET_URL = 'https://corsproxy.io/?' + encodeURIComponent('https://docs.google.com/spreadsheets/d/1X0dFLVkvpf_SKpIpDjx12vUQb07xLQ0Ow3aNVF9PKpU/export?format=csv&gid=540504181');
+const SHEET_URL = 'https://corsproxy.io/?' + encodeURIComponent('https://docs.google.com/spreadsheets/d/e/2PACX-1vTcGM8DUSsRWHAvtFI7gOZ_k6tvOaT92EwhriZMA6g99Ch7UWmMo6gmeNLR7N-p4BYPR2f1CnFPEe2k/pubhtml');
 
 // Classify a product string into a broad service type
 function classifyProduct(productStr) {
@@ -1335,3 +1335,4 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 });
+
