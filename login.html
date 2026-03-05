@@ -112,23 +112,39 @@
     <div class="login-card">
         <img src="descarga.jpg" alt="SAS Logo" class="login-logo" onerror="this.src=''; this.alt='SAS Academy'">
         <h2 class="login-title">Acceso Restringido</h2>
-        <p class="login-subtitle">Introduce la clave de equipo para continuar</p>
+        <p class="login-subtitle">Introduce tus credenciales para continuar</p>
 
         <div class="input-group">
-            <label for="pwd">Contraseña de Acceso</label>
+            <label for="email">Correo Electrónico</label>
+            <input type="email" id="email" placeholder="tu-email@smartalignerservices.com" autocomplete="username"
+                onkeypress="handleEnter(event)">
+        </div>
+
+        <div class="input-group">
+            <label for="pwd">Contraseña</label>
             <input type="password" id="pwd" placeholder="••••••••" autocomplete="current-password"
                 onkeypress="handleEnter(event)">
         </div>
 
-        <button class="login-btn" onclick="checkLogin()">Acceder al Dashboard</button>
-        <div id="error-msg" class="error-msg">Contraseña incorrecta. Por favor, inténtalo de nuevo.</div>
+        <button id="submit-btn" class="login-btn" onclick="checkLogin()">Acceder al Dashboard</button>
+        <div id="error-msg" class="error-msg">Credenciales incorrectas. Por favor, inténtalo de nuevo.</div>
     </div>
 
+    <!-- Supabase SDK -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script>
-        // Check if already logged in
-        if (localStorage.getItem('sas_auth') === 'true') {
-            window.location.href = 'index.html';
+        const SUPABASE_URL = 'https://vbbirpbauowtipmugayq.supabase.co';
+        const SUPABASE_KEY = 'sb_publishable_-d2OZVqMzbK_1uZ1sw6JAA_Q2nLMJX9';
+        const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+        // Check if already logged in via Supabase
+        async function checkSession() {
+            const { data } = await supabaseClient.auth.getSession();
+            if (data.session) {
+                window.location.href = 'index.html';
+            }
         }
+        checkSession();
 
         function handleEnter(e) {
             if (e.key === 'Enter') {
@@ -136,23 +152,47 @@
             }
         }
 
-        function checkLogin() {
+        async function checkLogin() {
+            const emailInput = document.getElementById('email').value;
             const pwdInput = document.getElementById('pwd').value;
             const errorMsg = document.getElementById('error-msg');
+            const btn = document.getElementById('submit-btn');
 
-            // Hardcoded password "Sas2025!" for simplicity right now
-            if (pwdInput === 'Sas2025!') {
-                localStorage.setItem('sas_auth', 'true');
-                window.location.href = 'index.html';
-            } else {
-                errorMsg.style.display = 'block';
-                // shake effect
-                const card = document.querySelector('.login-card');
-                card.style.transform = 'translateX(-10px)';
-                setTimeout(() => card.style.transform = 'translateX(10px)', 100);
-                setTimeout(() => card.style.transform = 'translateX(-10px)', 200);
-                setTimeout(() => card.style.transform = 'translateX(0)', 300);
+            if (!emailInput || !pwdInput) {
+                showError("Por favor rellena ambos campos");
+                return;
             }
+
+            btn.disabled = true;
+            btn.textContent = 'Accediendo...';
+            errorMsg.style.display = 'none';
+
+            const { data, error } = await supabaseClient.auth.signInWithPassword({
+                email: emailInput,
+                password: pwdInput,
+            });
+
+            if (error) {
+                showError(error.message.includes('Invalid login') ? 'Credenciales incorrectas' : 'Error al inciar sesión');
+                btn.disabled = false;
+                btn.textContent = 'Acceder al Dashboard';
+            } else {
+                localStorage.setItem('sas_auth', 'true'); // Keep for legacy checks if any
+                window.location.href = 'index.html';
+            }
+        }
+
+        function showError(msg) {
+            const errorMsg = document.getElementById('error-msg');
+            errorMsg.textContent = msg;
+            errorMsg.style.display = 'block';
+
+            // shake effect
+            const card = document.querySelector('.login-card');
+            card.style.transform = 'translateX(-10px)';
+            setTimeout(() => card.style.transform = 'translateX(10px)', 100);
+            setTimeout(() => card.style.transform = 'translateX(-10px)', 200);
+            setTimeout(() => card.style.transform = 'translateX(0)', 300);
         }
     </script>
 </body>

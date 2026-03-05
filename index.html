@@ -34,8 +34,11 @@
                     <li class="active"><a href="#dashboard" id="nav-dashboard"><i>📊</i> Resumen</a></li>
                     <li><a href="#vendors" id="nav-vendors"><i>👤</i> Vendedores</a></li>
                     <li><a href="#publicity" id="nav-publicity"><i>📣</i> Publicidad</a></li>
+                    <li><a href="#registro" id="nav-registro"><i>📝</i> Registro</a></li>
                     <li><a href="#" id="nav-logout" style="color: #ef4444; margin-top: 20px;"><i>🚪</i> Cerrar
-                            Sesión</a></li>
+                            Sesión <span id="user-email-display"
+                                style="font-size:0.75rem; display:block; color:var(--text-muted); margin-top:4px;"></span></a>
+                    </li>
                 </ul>
             </nav>
             <div class="file-upload-container" id="sync-container">
@@ -146,10 +149,11 @@
                 <div id="new-sale-modal" class="modal-overlay hidden">
                     <div class="modal-content">
                         <div class="modal-header">
-                            <h3>Registrar Nueva Operación</h3>
+                            <h3 id="modal-sale-title">Registrar Nueva Operación</h3>
                             <button class="close-modal" id="btn-close-sale">×</button>
                         </div>
                         <form id="new-sale-form" class="sale-form">
+                            <input type="hidden" id="edit-sale-id">
                             <div class="form-grid">
                                 <div class="input-group">
                                     <label>Fecha de Venta (y Hora)</label>
@@ -243,6 +247,7 @@
                                 <th>Cliente</th>
                                 <th>Producto</th>
                                 <th>Importe</th>
+                                <th>Acciones</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -334,6 +339,8 @@
         </main>
     </div>
 
+    <!-- Supabase SDK -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="app.js"></script>
 </body>
 

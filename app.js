@@ -8,7 +8,6 @@ const FILES = {
     metodo: null
 };
 
-// Application State
 const STATE = {
     rawNuevosData: [],
     selectedYear: 'all',
@@ -24,8 +23,10 @@ const STATE = {
     totalSales: 0,
     totalUnits: 0,
     processedCount: 0,
-    leadsLoaded: false,   // tracks if Google Sheet was fetched
-    rawLeadsData: []      // stores leads from Google Sheet
+    leadsLoaded: false,
+    rawLeadsData: [],
+    currentUserEmail: '',
+    currentUserDisplay: ''
 };
 
 // Chart Instances (to destroy/recreate if needed)
@@ -44,7 +45,21 @@ const chartColors = [
 const chartGradients = [];
 
 // --- Initialization ---
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
+    // Check Authentication
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    if (!session) {
+        window.location.href = 'login.html';
+        return;
+    }
+
+    STATE.currentUserEmail = session.user.email;
+    const namePart = session.user.email.split('@')[0].split('-').map(s => s.charAt(0).toUpperCase() + s.slice(1)).join(' ');
+    STATE.currentUserDisplay = namePart;
+
+    const emailDisplay = document.getElementById('user-email-display');
+    if (emailDisplay) emailDisplay.textContent = STATE.currentUserDisplay;
+
     initNavigation();
     initMonthFilter();
     initVendorFilters();
@@ -100,18 +115,21 @@ function initNavigation() {
     const navDashboard = document.getElementById('nav-dashboard');
     const navVendors = document.getElementById('nav-vendors');
     const navPublicity = document.getElementById('nav-publicity');
+    const navRegistro = document.getElementById('nav-registro');
+
     const viewDashboard = document.getElementById('view-dashboard');
     const viewVendors = document.getElementById('view-vendors');
     const viewPublicity = document.getElementById('view-publicity');
+    const viewRegistro = document.getElementById('view-registro');
 
     // Helper: hide all views & deactivate all nav links
     function showView(activeView, activeNav) {
-        [viewDashboard, viewVendors, viewPublicity].forEach(v => {
+        [viewDashboard, viewVendors, viewPublicity, viewRegistro].forEach(v => {
             if (!v) return;
             v.classList.add('hidden');
             v.classList.remove('active');
         });
-        [navDashboard, navVendors, navPublicity].forEach(n => {
+        [navDashboard, navVendors, navPublicity, navRegistro].forEach(n => {
             if (!n) return;
             n.parentElement.classList.remove('active');
         });
@@ -143,11 +161,21 @@ function initNavigation() {
         });
     }
 
+    if (navRegistro) {
+        navRegistro.addEventListener('click', (e) => {
+            e.preventDefault();
+            showView(viewRegistro, navRegistro);
+            // Fetch logs when entering tab
+            if (typeof fetchLogs === 'function') fetchLogs();
+        });
+    }
+
     // Logout listener
     const navLogout = document.getElementById('nav-logout');
     if (navLogout) {
-        navLogout.addEventListener('click', (e) => {
+        navLogout.addEventListener('click', async (e) => {
             e.preventDefault();
+            await supabaseClient.auth.signOut();
             localStorage.removeItem('sas_auth');
             window.location.href = 'login.html';
         });
@@ -175,6 +203,12 @@ function initNavigation() {
 
     if (btnAddSale && modalSale) {
         btnAddSale.addEventListener('click', () => {
+            // Setup for explicit NEW sale
+            document.getElementById('edit-sale-id').value = '';
+            document.getElementById('modal-sale-title').textContent = 'Registrar Nueva Operación';
+            document.getElementById('btn-submit-sale').textContent = 'Guardar Operación';
+            formSale.reset();
+
             // Set default datetime to now
             const now = new Date();
             now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
@@ -219,32 +253,53 @@ function initNavigation() {
 
             try {
                 const emailVal = (document.getElementById('sale-email') || {}).value || '';
+                const editId = document.getElementById('edit-sale-id').value;
 
-                const { data, error } = await supabaseClient
-                    .from('ventas')
-                    .insert([
-                        {
-                            'Marca temporal': formattedDate,
-                            'Vendedor': vendorVal,
-                            'Nombre completo': clientVal,
-                            'Email': emailVal.trim().toLowerCase(),
-                            'Qué compra?': productVal,
-                            'Valor de compra TOTAL (independientemente de que pague mensual)': formattedAmount,
-                            'Renovación': renewalVal,
-                            'País': countryVal,
-                            'Forma de pago': paymentVal,
-                            'Promesa': promiseVal
-                        }
-                    ]);
+                const newRowData = {
+                    'Marca temporal': formattedDate,
+                    'Vendedor': vendorVal,
+                    'Nombre completo': clientVal,
+                    'Email': emailVal.trim().toLowerCase(),
+                    'Qué compra?': productVal,
+                    'Valor de compra TOTAL (independientemente de que pague mensual)': formattedAmount,
+                    'Renovación': renewalVal,
+                    'País': countryVal,
+                    'Forma de pago': paymentVal,
+                    'Promesa': promiseVal
+                };
 
-                if (error) throw error;
+                if (editId) {
+                    // Updating an existing sale
+                    const { error } = await supabaseClient
+                        .from('ventas')
+                        .update(newRowData)
+                        .eq('id', editId);
+                    if (error) throw error;
 
-                // Success! 
-                alert('Operación guardada correctamente.');
+                    // Log the edit
+                    const oldRow = STATE.rawNuevosData.find(r => r.id === editId) || {};
+                    await supabaseClient.from('ventas_logs').insert([{
+                        venta_id: editId.toString(),
+                        usuario_editor: STATE.currentUserDisplay || STATE.currentUserEmail,
+                        datos_anteriores: oldRow,
+                        datos_nuevos: newRowData
+                    }]);
+                    alert('Operación actualizada correctamente.');
+
+                } else {
+                    // Inserting new sale
+                    const { error } = await supabaseClient
+                        .from('ventas')
+                        .insert([newRowData]);
+                    if (error) throw error;
+                    alert('Operación guardada correctamente.');
+                }
+
                 modalSale.classList.add('hidden');
                 formSale.reset();
+                document.getElementById('edit-sale-id').value = '';
 
-                // We should re-fetch data here 
+                // Refetch
                 fetchSupabaseData();
             } catch (err) {
                 console.error('Error saving sale:', err);
@@ -256,6 +311,57 @@ function initNavigation() {
         });
     }
 } // end initNavigation
+
+// --- Modal Edit Helper ---
+window.openEditModal = function (id) {
+    const row = STATE.rawNuevosData.find(r => String(r.id) === String(id));
+    if (!row) return;
+
+    document.getElementById('edit-sale-id').value = id;
+    document.getElementById('modal-sale-title').textContent = 'Editar Operación';
+    document.getElementById('btn-submit-sale').textContent = 'Actualizar Operación';
+
+    // Parse date (Marca temporal) into YYYY-MM-DDTHH:MM
+    let dateStr = row['Marca temporal'] || row['Fecha de compra'] || '';
+    if (dateStr && dateStr.includes('/')) {
+        const parts = dateStr.split(/[\/ :]/);
+        if (parts.length >= 3) {
+            let y = parseInt(parts[2]);
+            if (y < 100) y += 2000;
+            const m = parts[1].padStart(2, '0');
+            const d = parts[0].padStart(2, '0');
+            const hh = parts[3] ? parts[3].padStart(2, '0') : '00';
+            const mm = parts[4] ? parts[4].padStart(2, '0') : '00';
+            document.getElementById('sale-date').value = `${y}-${m}-${d}T${hh}:${mm}`;
+        }
+    } else {
+        document.getElementById('sale-date').value = '';
+    }
+
+    const setSelectSafe = (id, val) => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        const opts = Array.from(el.options).map(o => o.value);
+        if (opts.includes(val)) el.value = val;
+    };
+
+    setSelectSafe('sale-vendor', row['Vendedor']);
+    document.getElementById('sale-client').value = row['Nombre completo'] || row['Nombre de cliente'] || '';
+    if (document.getElementById('sale-email')) document.getElementById('sale-email').value = row['Email'] || row['Correo Electrónico'] || '';
+    document.getElementById('sale-product').value = row['Qué compra?'] || row['Producto'] || '';
+
+    // Parse amount back to native number float
+    let valStr = row['Valor de compra TOTAL (independientemente de que pague mensual)'] || row['Ticket total'] || '0';
+    valStr = valStr.replace('€', '').trim().replace(',', '.');
+    document.getElementById('sale-amount').value = parseFloat(valStr) || 0;
+
+    setSelectSafe('sale-renewal', row['Renovación']);
+    document.getElementById('sale-country').value = row['País'] || '';
+    setSelectSafe('sale-payment-method', row['Forma de pago']);
+    document.getElementById('sale-promise').value = row['Promesa'] || '';
+
+    document.getElementById('new-sale-modal').classList.remove('hidden');
+};
 
 function initSearch() {
     // Removed
@@ -928,10 +1034,23 @@ function updateVendorUI() {
         const tdAmount = document.createElement('td');
         tdAmount.textContent = formatCurrency.format(saleAmount);
 
+        const tdActions = document.createElement('td');
+        if (row.id) {
+            const btnEdit = document.createElement('button');
+            btnEdit.className = 'action-btn';
+            btnEdit.style.padding = '4px 8px';
+            btnEdit.style.fontSize = '0.9rem';
+            btnEdit.title = 'Editar Operación';
+            btnEdit.innerHTML = '✏️';
+            btnEdit.onclick = () => window.openEditModal(row.id);
+            tdActions.appendChild(btnEdit);
+        }
+
         tr.appendChild(tdDate);
         tr.appendChild(tdClient);
         tr.appendChild(tdProduct);
         tr.appendChild(tdAmount);
+        tr.appendChild(tdActions);
 
         tableBody.appendChild(tr);
     });
@@ -1456,4 +1575,129 @@ document.addEventListener('DOMContentLoaded', () => {
             if (STATE.leadsLoaded) updatePublicityUI();
         });
     }
+});
+
+// --- Registro (Logs) Feature ---
+let allLogs = [];
+
+async function fetchLogs() {
+    console.log('Fetching logs...');
+    const loadingEl = document.getElementById('reg-loading');
+    if (loadingEl) loadingEl.classList.remove('hidden');
+
+    try {
+        const { data, error } = await supabaseClient
+            .from('ventas_logs')
+            .select('*')
+            .order('fecha_modificacion', { ascending: false })
+            .limit(150);
+
+        if (error) throw error;
+
+        allLogs = data || [];
+        populateLogFilters();
+        renderLogs();
+    } catch (err) {
+        console.error('Error fetching logs:', err);
+    } finally {
+        if (loadingEl) loadingEl.classList.add('hidden');
+    }
+}
+
+function populateLogFilters() {
+    const yearSelect = document.getElementById('regYearFilter');
+    const monthSelect = document.getElementById('regMonthFilter');
+    if (!yearSelect || !monthSelect) return;
+
+    const years = new Set();
+    const months = new Set();
+
+    allLogs.forEach(log => {
+        const d = new Date(log.fecha_modificacion);
+        if (!isNaN(d)) {
+            years.add(d.getFullYear().toString());
+            months.add((d.getMonth() + 1).toString());
+        }
+    });
+
+    // Populate Year
+    const currentY = yearSelect.value;
+    yearSelect.innerHTML = '<option value="all">Todos</option>';
+    [...years].sort().reverse().forEach(y => {
+        yearSelect.insertAdjacentHTML('beforeend', `<option value="${y}">${y}</option>`);
+    });
+    if (currentY !== 'all' && [...years].includes(currentY)) yearSelect.value = currentY;
+
+    // Populate Month
+    const currentM = monthSelect.value;
+    monthSelect.innerHTML = '<option value="all">Todos los Meses</option>';
+    [...months].sort((a, b) => parseInt(a) - parseInt(b)).forEach(m => {
+        const label = new Date(2025, parseInt(m) - 1, 1).toLocaleDateString('es-ES', { month: 'long' });
+        monthSelect.insertAdjacentHTML('beforeend', `<option value="${m}">${label.charAt(0).toUpperCase() + label.slice(1)}</option>`);
+    });
+    if (currentM !== 'all' && [...months].includes(currentM)) monthSelect.value = currentM;
+}
+
+function renderLogs() {
+    const tbody = document.querySelector('#registro-table tbody');
+    if (!tbody) return;
+    tbody.innerHTML = '';
+
+    const yFilter = document.getElementById('regYearFilter')?.value || 'all';
+    const mFilter = document.getElementById('regMonthFilter')?.value || 'all';
+
+    const filtered = allLogs.filter(log => {
+        const d = new Date(log.fecha_modificacion);
+        if (isNaN(d)) return false;
+
+        const yMatch = (yFilter === 'all') || (d.getFullYear().toString() === yFilter);
+        const mMatch = (mFilter === 'all') || ((d.getMonth() + 1).toString() === mFilter);
+        return yMatch && mMatch;
+    });
+
+    filtered.forEach(log => {
+        const tr = document.createElement('tr');
+
+        const d = new Date(log.fecha_modificacion);
+        const tdDate = document.createElement('td');
+        tdDate.textContent = d.toLocaleString('es-ES');
+
+        const tdEditor = document.createElement('td');
+        tdEditor.textContent = log.usuario_editor || 'Desconocido';
+
+        const clientName = (log.datos_anteriores && log.datos_anteriores['Nombre completo']) || log.venta_id || '-';
+        const tdClient = document.createElement('td');
+        tdClient.textContent = clientName;
+
+        const tdChanges = document.createElement('td');
+        tdChanges.style.fontSize = '0.85rem';
+
+        // Compare previous and new JSON
+        let changesStr = '';
+        if (log.datos_anteriores && log.datos_nuevos) {
+            const keys = new Set([...Object.keys(log.datos_anteriores), ...Object.keys(log.datos_nuevos)]);
+            keys.forEach(k => {
+                const oldV = log.datos_anteriores[k];
+                const newV = log.datos_nuevos[k];
+                if (String(oldV) !== String(newV) && k !== 'id') {
+                    changesStr += `<b>${k}:</b> <span style="color:#ef4444;text-decoration:line-through">${oldV || '(vacío)'}</span> ➜ <span style="color:#10b981">${newV || '(vacío)'}</span><br/>`;
+                }
+            });
+        }
+        if (!changesStr) changesStr = '<i>Mismos datos guardados</i>';
+
+        tdChanges.innerHTML = changesStr;
+
+        tr.appendChild(tdDate);
+        tr.appendChild(tdEditor);
+        tr.appendChild(tdClient);
+        tr.appendChild(tdChanges);
+        tbody.appendChild(tr);
+    });
+}
+
+// Add event listeners for log filters
+document.addEventListener('DOMContentLoaded', () => {
+    document.getElementById('regYearFilter')?.addEventListener('change', renderLogs);
+    document.getElementById('regMonthFilter')?.addEventListener('change', renderLogs);
 });
