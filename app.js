@@ -256,71 +256,46 @@ function initNavigation() {
             // Format to Euro string (e.g. 15,00 €)
             const formattedAmount = `${parseFloat(amountVal).toFixed(2).replace('.', ',')} €`;
 
+            const emailVal = (document.getElementById('sale-email') || {}).value || '';
+            const editId = document.getElementById('edit-sale-id').value;
+
             try {
-                const emailVal = (document.getElementById('sale-email') || {}).value || '';
-                const editId = document.getElementById('edit-sale-id').value;
 
                 if (editId) {
-                    // Updating an existing sale - fetch original row to merge and not lose data
-                    const oldRow = STATE.rawNuevosData.find(r => String(r.id) === String(editId)) || {};
+                    // Build explicit update payload using exact Supabase column names
+                    const updatePayload = {
+                        'Marca temporal': formattedDate,
+                        'Vendedor': vendorVal,
+                        'Nombre completo': clientVal,
+                        'Email': emailVal.trim().toLowerCase(),
+                        'Qué compra?': productVal,
+                        'Valor de compra TOTAL (independientemente de que pague mensual)': formattedAmount,
+                        'Es una renovación?': renewalVal,
+                        'En qué país vive?': countryVal,
+                        'Idioma': languageVal,
+                        'Forma de pago': paymentVal,
+                        'Qué se le promete al cliente': promiseVal
+                    };
 
-                    const newRowData = { ...oldRow };
+                    console.log('UPDATE payload:', updatePayload);
 
-                    // Clean payload: remove Supabase protected keys that shouldn't be part of update content
-                    delete newRowData.id;
-                    delete newRowData.created_at;
-
-                    // Carefully map the UI over the existing keys
-                    if ('Marca temporal' in newRowData) newRowData['Marca temporal'] = formattedDate;
-                    if ('Fecha de compra' in newRowData) newRowData['Fecha de compra'] = formattedDate;
-
-                    if ('Vendedor' in newRowData) newRowData['Vendedor'] = vendorVal;
-
-                    if ('Nombre completo' in newRowData) newRowData['Nombre completo'] = clientVal;
-                    if ('Nombre de cliente' in newRowData) newRowData['Nombre de cliente'] = clientVal;
-
-                    if ('Email' in newRowData) newRowData['Email'] = emailVal.trim().toLowerCase();
-                    if ('Correo Electrónico' in newRowData) newRowData['Correo Electrónico'] = emailVal.trim().toLowerCase();
-
-                    if ('Qué compra?' in newRowData) newRowData['Qué compra?'] = productVal;
-                    if ('Producto' in newRowData) newRowData['Producto'] = productVal;
-
-                    if ('Valor de compra TOTAL (independientemente de que pague mensual)' in newRowData) {
-                        newRowData['Valor de compra TOTAL (independientemente de que pague mensual)'] = formattedAmount;
-                    }
-                    if ('Ticket total' in newRowData) newRowData['Ticket total'] = formattedAmount;
-
-                    if ('Renovación' in newRowData) newRowData['Renovación'] = renewalVal;
-                    if ('Es una renovación?' in newRowData) newRowData['Es una renovación?'] = renewalVal;
-
-                    if ('País' in newRowData) newRowData['País'] = countryVal;
-                    if ('En qué país vive?' in newRowData) newRowData['En qué país vive?'] = countryVal;
-
-                    if ('Forma de pago' in newRowData) newRowData['Forma de pago'] = paymentVal;
-
-                    if ('Qué se le promete al cliente' in newRowData) newRowData['Qué se le promete al cliente'] = promiseVal;
-                    if ('Promesa' in newRowData) newRowData['Promesa'] = promiseVal;
-
-                    newRowData['Idioma'] = languageVal;
-
-                    console.log("Attempting to UPDATE with payload:", newRowData);
-
-                    // Execute update
                     const { error } = await supabaseClient
                         .from('ventas')
-                        .update(newRowData)
+                        .update(updatePayload)
                         .eq('id', editId);
+
                     if (error) {
-                        console.error("Supabase UPDATE Error Object:", error);
-                        throw new Error(`Update falló: ${error.message || error.details}`);
+                        console.error('Supabase UPDATE Error:', error);
+                        throw new Error(`Update falló: ${error.message || error.details || JSON.stringify(error)}`);
                     }
 
                     // Log the edit
+                    const oldRow = STATE.rawNuevosData.find(r => String(r.id) === String(editId)) || {};
                     await supabaseClient.from('ventas_logs').insert([{
                         venta_id: editId.toString(),
                         usuario_editor: STATE.currentUserDisplay || STATE.currentUserEmail,
                         datos_anteriores: oldRow,
-                        datos_nuevos: newRowData
+                        datos_nuevos: updatePayload
                     }]);
                     alert('Operación actualizada correctamente.');
 
@@ -1345,7 +1320,7 @@ function renderUnitsByProductChart() {
 // ADVERTISING ATTRIBUTION ENGINE
 // ═══════════════════════════════════════════════════════════
 
-const SHEET_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTcGM8DUSsRWHAvtFI7gOZ_k6tvOaT92EwhriZMA6g99Ch7UWmMo6gmeNLR7N-p4BYPR2f1CnFPEe2k/pub?gid=540504181&single=true&output=csv';
+const SHEET_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTcGM8DUSsRWHAvtFI7gOZ_k6tvOaT92EwhriZMA6g99Ch7UWmMo6gmeNLR7N-p4BYPR2f1CnFPEe2k/pub?gid=2019545794&single=true&output=csv';
 
 // Classify a product string into a broad service type
 function classifyProduct(productStr) {
@@ -1422,9 +1397,14 @@ async function fetchAndRenderAttribution() {
                 skipEmptyLines: 'greedy',
                 complete(results) {
                     if (results.data && results.data.length > 1) {
-                        // Find the header row (the one containing 'Nombre completo' or 'Marca temporal')
+                        // Find the header row
                         let headerRowIndex = results.data.findIndex(row =>
-                            row.some(cell => String(cell).includes('Nombre completo') || String(cell).includes('Marca temporal'))
+                            row.some(cell =>
+                                String(cell).includes('Nombre completo') ||
+                                String(cell).includes('Marca temporal') ||
+                                String(cell).includes('Timestamp') ||
+                                String(cell).includes('Email Address')
+                            )
                         );
 
                         if (headerRowIndex === -1) headerRowIndex = 0; // fallback
@@ -1470,7 +1450,12 @@ async function fetchAndRenderAttribution() {
                     complete(results) {
                         if (results.data && results.data.length > 1) {
                             let headerRowIndex = results.data.findIndex(row =>
-                                row.some(cell => String(cell).includes('Nombre completo') || String(cell).includes('Marca temporal'))
+                                row.some(cell =>
+                                    String(cell).includes('Nombre completo') ||
+                                    String(cell).includes('Marca temporal') ||
+                                    String(cell).includes('Timestamp') ||
+                                    String(cell).includes('Email Address')
+                                )
                             );
                             if (headerRowIndex === -1) headerRowIndex = 0;
 
@@ -1526,6 +1511,7 @@ function updatePublicityUI() {
     const pubYearFilter = (document.getElementById('pubYearFilter') || {}).value || 'all';
     const pubMonthFilter = (document.getElementById('pubMonthFilter') || {}).value || 'all';
 
+    // Filter to paid leads only (Fuente = 'Publicidad')
     const paidLeads = leads.filter(l => (l['Fuente'] || '').toLowerCase().includes('publicidad'));
 
     let totalAttribution = 0;
@@ -1534,11 +1520,15 @@ function updatePublicityUI() {
 
     paidLeads.forEach(lead => {
         // Handle different possible column names for Email, Date, Name
-        const email = (lead['Correo electrónico'] || lead['Email'] || '').trim().toLowerCase();
+        const email = (
+            lead['Correo electrónico'] ||
+            lead['Email'] ||
+            lead['Email Address'] || ''
+        ).trim().toLowerCase();
         if (!email) return;
 
         const matchedSales = salesByEmail[email] || [];
-        const leadDate = parseSheetDate(lead['Fecha de compra'] || lead['Fecha'] || lead['Marca temporal']);
+        const leadDate = parseSheetDate(lead['Fecha'] || lead['Fecha de compra'] || lead['Marca temporal'] || lead['Timestamp'] || '');
         if (!leadDate) return;
 
         if (matchedSales.length === 0) {
@@ -1598,10 +1588,10 @@ function updatePublicityUI() {
     tableRows.forEach(({ lead, sale, days, attr, model, saleAmount, isCrossSell, saleDate }) => {
         const tr = document.createElement('tr');
         tr.innerHTML = `
-            <td>${lead['Nombre completo'] || lead['Nombre'] || '-'}</td>
-            <td style="font-size:0.8rem">${(lead['Correo electrónico'] || lead['Email'] || '-')}</td>
-            <td>${lead['Fecha de compra'] || lead['Fecha'] || lead['Marca temporal'] || '-'}</td>
-            <td>${lead['Producto'] || '-'}</td>
+            <td>${lead['Nombre'] || lead['Nombre completo'] || '-'}</td>
+            <td style="font-size:0.8rem">${lead['Email'] || '-'}</td>
+            <td>${lead['Fecha'] || lead['Marca temporal'] || '-'}</td>
+            <td>${lead['Producto'] || lead['Fuente'] || '-'}</td>
             <td>${saleDate ? saleDate.toLocaleDateString('es-ES') : '-'}</td>
             <td>${sale ? getProductStr(sale) : '-'}</td>
             <td>${days !== null ? days : '-'}</td>
