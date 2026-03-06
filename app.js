@@ -1,4 +1,4 @@
-// --- Constants & Global State ---
+﻿// --- Constants & Global State ---
 const SUPABASE_URL = 'https://vbbirpbauowtipmugayq.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_-d2OZVqMzbK_1uZ1sw6JAA_Q2nLMJX9';
 const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
@@ -1386,104 +1386,45 @@ async function fetchAndRenderAttribution() {
     const loadingEl = document.getElementById('pub-loading');
     if (loadingEl) loadingEl.classList.remove('hidden');
 
+    // Helper: parse CSV text (no XHR, avoids CORS)
+    function parseCsvText(text) {
+        return Papa.parse(text, { header: true, skipEmptyLines: 'greedy' }).data;
+    }
+
     try {
-        const fetchUrl = SHEET_URL + '&t=' + Date.now();
-        console.log('Intentando carga directa:', fetchUrl);
+        // Strategy 1: Direct fetch() - more CORS-friendly than PapaParse XHR download
+        const directUrl = SHEET_URL + '&t=' + Date.now();
+        console.log('Intentando fetch directo:', directUrl);
+        let csvText = null;
 
-        await new Promise((resolve, reject) => {
-            Papa.parse(fetchUrl, {
-                download: true,
-                header: false, // Change to false to handle junk rows manually
-                skipEmptyLines: 'greedy',
-                complete(results) {
-                    if (results.data && results.data.length > 1) {
-                        // Find the header row
-                        let headerRowIndex = results.data.findIndex(row =>
-                            row.some(cell =>
-                                String(cell).includes('Nombre completo') ||
-                                String(cell).includes('Marca temporal') ||
-                                String(cell).includes('Timestamp') ||
-                                String(cell).includes('Email Address')
-                            )
-                        );
-
-                        if (headerRowIndex === -1) headerRowIndex = 0; // fallback
-
-                        const headers = results.data[headerRowIndex];
-                        const rows = results.data.slice(headerRowIndex + 1).map(row => {
-                            const obj = {};
-                            headers.forEach((h, i) => {
-                                if (h) obj[h.trim()] = row[i];
-                            });
-                            return obj;
-                        });
-
-                        STATE.rawLeadsData = rows;
-                        STATE.leadsLoaded = true;
-                        console.log('✅ Leads cargados directamente:', rows.length, 'filas');
-                        resolve();
-                    } else {
-                        reject(new Error('Respuesta vacía de Google Sheets.'));
-                    }
-                },
-                error(err) { reject(err); }
-            });
-        });
-
-        updatePublicityUI();
-    } catch (err) {
-        console.warn('Carga directa fallida, intentando con proxy...', err);
         try {
-            console.log('Carga directa fallida (posible CORS o publicación), intentando con Proxy...');
-            const proxyUrl = 'https://api.allorigins.win/get?url=' + encodeURIComponent(SHEET_URL);
-
-            const response = await fetch(proxyUrl);
-            const data = await response.json();
-            const csvContent = data.contents;
-
-            if (!csvContent) throw new Error('Proxy devolvió contenido vacío');
-
-            await new Promise((resolve, reject) => {
-                Papa.parse(csvContent, {
-                    header: false,
-                    skipEmptyLines: 'greedy',
-                    complete(results) {
-                        if (results.data && results.data.length > 1) {
-                            let headerRowIndex = results.data.findIndex(row =>
-                                row.some(cell =>
-                                    String(cell).includes('Nombre completo') ||
-                                    String(cell).includes('Marca temporal') ||
-                                    String(cell).includes('Timestamp') ||
-                                    String(cell).includes('Email Address')
-                                )
-                            );
-                            if (headerRowIndex === -1) headerRowIndex = 0;
-
-                            const headers = results.data[headerRowIndex];
-                            const rows = results.data.slice(headerRowIndex + 1).map(row => {
-                                const obj = {};
-                                headers.forEach((h, i) => {
-                                    if (h) obj[h.trim()] = row[i];
-                                });
-                                return obj;
-                            });
-
-                            STATE.rawLeadsData = rows;
-                            STATE.leadsLoaded = true;
-                            console.log('✅ Leads cargados vía Proxy:', rows.length, 'filas');
-                            resolve();
-                        } else {
-                            reject(new Error('Datos inválidos tras proxy'));
-                        }
-                    },
-                    error(err) { reject(err); }
-                });
-            });
-            updatePublicityUI();
-        } catch (proxyErr) {
-            console.error('Error FATAL cargando leads:', proxyErr);
-            alert('ERROR CRÍTICO: No se puede acceder a los leads de Google Sheets.\n\nPOR FAVOR, VERIFICA:\n1. Abre el Excel original.\n2. Archivo -> Compartir -> Publicar en la web.\n3. Asegúrate de que pone "Toda la página" (o la pestaña de Leads) y "Valores separados por comas (.csv)".\n4. Dale al botón "Publicar" (o "Detener publicación" y vuelve a darle).');
+            const directResp = await fetch(directUrl);
+            if (directResp.ok) csvText = await directResp.text();
+        } catch (e) {
+            console.warn('Fetch directo bloqueado, usando proxy...', e.message);
         }
+
+        // Strategy 2: allorigins proxy fallback
+        if (!csvText || csvText.length < 20) {
+            console.log('Usando proxy allorigins...');
+            const proxyResp = await fetch('https://api.allorigins.win/get?url=' + encodeURIComponent(SHEET_URL));
+            if (!proxyResp.ok) throw new Error('Proxy HTTP ' + proxyResp.status);
+            const json = await proxyResp.json();
+            csvText = json.contents;
+            if (!csvText || csvText.length < 20) throw new Error('Proxy devolvio contenido vacio');
+        }
+
+        const rows = parseCsvText(csvText);
+        if (!rows || rows.length === 0) throw new Error('CSV sin filas de datos');
+
+        STATE.rawLeadsData = rows;
+        STATE.leadsLoaded = true;
+        console.log('Leads cargados:', rows.length, 'filas');
+        updatePublicityUI();
+
+    } catch (err) {
+        console.error('Error cargando leads:', err);
+        alert('No se pudieron cargar los leads. Error: ' + err.message);
     } finally {
         if (loadingEl) loadingEl.classList.add('hidden');
     }
