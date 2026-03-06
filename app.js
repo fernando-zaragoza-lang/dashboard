@@ -249,8 +249,9 @@ function initNavigation() {
             const paymentVal = document.getElementById('sale-payment-method').value;
             const promiseVal = document.getElementById('sale-promise').value;
 
-            // Format datetime to resemble the Google Form string slightly (DD/MM/YYYY HH:MM:SS)
-            const d = new Date(dateVal);
+            // Format datetime — guard against empty/invalid date
+            let d = new Date(dateVal);
+            if (!dateVal || isNaN(d.getTime())) d = new Date(); // fallback to now
             const formattedDate = `${d.getDate().toString().padStart(2, '0')}/${(d.getMonth() + 1).toString().padStart(2, '0')}/${d.getFullYear()} ${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}:00`;
 
             // Format to Euro string (e.g. 15,00 €)
@@ -348,29 +349,52 @@ function initNavigation() {
 
 // --- Modal Edit Helper ---
 window.openEditModal = function (id) {
+    console.log('=== openEditModal llamado con id:', id, 'tipo:', typeof id);
+    console.log('STATE.rawNuevosData tiene', STATE.rawNuevosData.length, 'filas');
+    if (STATE.rawNuevosData.length > 0) {
+        const sample = STATE.rawNuevosData.slice(0, 3).map(r => ({ id: r.id, tipo: typeof r.id }));
+        console.log('Muestra de IDs en rawNuevosData:', JSON.stringify(sample));
+    }
+
     const row = STATE.rawNuevosData.find(r => String(r.id) === String(id));
-    if (!row) return;
+    console.log('Resultado de búsqueda:', row ? 'ENCONTRADO' : 'NO ENCONTRADO');
+
+    if (!row) {
+        alert('No se encontró la operación con ID: ' + id + '. Consulta la consola (F12) para más detalles.');
+        return;
+    }
 
     document.getElementById('edit-sale-id').value = id;
     document.getElementById('modal-sale-title').textContent = 'Editar Operación';
     document.getElementById('btn-submit-sale').textContent = 'Actualizar Operación';
 
-    // Parse date (Marca temporal) into YYYY-MM-DDTHH:MM
-    let dateStr = row['Marca temporal'] || row['Fecha de compra'] || '';
-    if (dateStr && dateStr.includes('/')) {
-        const parts = dateStr.split(/[\/ :]/);
-        if (parts.length >= 3) {
-            let y = parseInt(parts[2]);
-            if (y < 100) y += 2000;
-            const m = parts[1].padStart(2, '0');
-            const d = parts[0].padStart(2, '0');
-            const hh = parts[3] ? parts[3].padStart(2, '0') : '00';
-            const mm = parts[4] ? parts[4].padStart(2, '0') : '00';
-            document.getElementById('sale-date').value = `${y}-${m}-${d}T${hh}:${mm}`;
+    // Parse date into YYYY-MM-DDTHH:MM — handles both ISO (from Supabase) and DD/MM/YYYY (from CSV)
+    const dateStr = row['Marca temporal'] || row['Fecha de compra'] || '';
+    let parsedDateVal = '';
+    if (dateStr) {
+        let dt;
+        if (dateStr.includes('T') || /^\d{4}-/.test(dateStr)) {
+            // ISO format: 2025-06-18T15:30:00 or 2025-06-18
+            dt = new Date(dateStr);
+        } else if (dateStr.includes('/')) {
+            // DD/MM/YYYY HH:MM:SS format
+            const parts = dateStr.split(/[\/ :]/);
+            let y = parseInt(parts[2]); if (y < 100) y += 2000;
+            dt = new Date(y, parseInt(parts[1]) - 1, parseInt(parts[0]),
+                parseInt(parts[3] || 0), parseInt(parts[4] || 0));
         }
-    } else {
-        document.getElementById('sale-date').value = '';
+        if (dt && !isNaN(dt.getTime())) {
+            dt.setMinutes(dt.getMinutes() - dt.getTimezoneOffset());
+            parsedDateVal = dt.toISOString().slice(0, 16);
+        }
     }
+    if (!parsedDateVal) {
+        // Fallback: current time
+        const now = new Date();
+        now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+        parsedDateVal = now.toISOString().slice(0, 16);
+    }
+    document.getElementById('sale-date').value = parsedDateVal;
 
     const setSelectSafe = (id, val) => {
         const el = document.getElementById(id);
