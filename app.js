@@ -303,14 +303,16 @@ function initNavigation() {
 
                     newRowData['Idioma'] = languageVal;
 
+                    console.log("Attempting to UPDATE with payload:", newRowData);
+
                     // Execute update
                     const { error } = await supabaseClient
                         .from('ventas')
                         .update(newRowData)
                         .eq('id', editId);
                     if (error) {
-                        console.error("Update Error:", error);
-                        throw error;
+                        console.error("Supabase UPDATE Error Object:", error);
+                        throw new Error(`Update falló: ${error.message || error.details}`);
                     }
 
                     // Log the edit
@@ -338,12 +340,14 @@ function initNavigation() {
                         'Qué se le promete al cliente': promiseVal
                     };
 
+                    console.log("Attempting to INSERT with payload:", newRowData);
+
                     const { error } = await supabaseClient
                         .from('ventas')
                         .insert([newRowData]);
                     if (error) {
-                        console.error('Insert Error:', error);
-                        throw error;
+                        console.error('Supabase INSERT Error Object:', error);
+                        throw new Error(`Insert falló: ${error.message || error.details}`);
                     }
                     alert('Operación guardada correctamente.');
                 }
@@ -355,8 +359,10 @@ function initNavigation() {
                 // Refetch and wait
                 await fetchSupabaseData();
             } catch (err) {
-                console.error('Error saving sale:', err);
-                alert('Ocurrió un error al guardar la operación. Por favor revisa la consola.');
+                console.error('--- DETAILED ERROR LOG ---');
+                console.error('Context:', editId ? `Edición ID ${editId}` : 'Nueva Inserción');
+                console.error('Error Object:', err);
+                alert(`Error al guardar: ${err.message || 'Consulta la consola para más detalles.'}`);
             } finally {
                 btnSubmit.textContent = originalText;
                 btnSubmit.disabled = false;
