@@ -123,6 +123,11 @@ body {
     white-space: nowrap;
 }
 
+/* Prevent background scroll when modal is open */
+body.modal-open {
+    overflow: hidden;
+}
+
 /* --- Modal & Form Styles --- */
 .modal-overlay {
     position: fixed;
