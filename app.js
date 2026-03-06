@@ -1454,25 +1454,50 @@ async function fetchAndRenderAttribution() {
     } catch (err) {
         console.warn('Carga directa fallida, intentando con proxy...', err);
         try {
-            const proxyUrl = 'https://api.allorigins.win/raw?url=' + encodeURIComponent(SHEET_URL);
+            console.log('Carga directa fallida (posible CORS o publicación), intentando con Proxy...');
+            const proxyUrl = 'https://api.allorigins.win/get?url=' + encodeURIComponent(SHEET_URL);
+
+            const response = await fetch(proxyUrl);
+            const data = await response.json();
+            const csvContent = data.contents;
+
+            if (!csvContent) throw new Error('Proxy devolvió contenido vacío');
+
             await new Promise((resolve, reject) => {
-                Papa.parse(proxyUrl, {
-                    download: true,
-                    header: true,
+                Papa.parse(csvContent, {
+                    header: false,
                     skipEmptyLines: 'greedy',
                     complete(results) {
-                        STATE.rawLeadsData = results.data;
-                        STATE.leadsLoaded = true;
-                        console.log('✅ Leads cargados vía proxy');
-                        resolve();
+                        if (results.data && results.data.length > 1) {
+                            let headerRowIndex = results.data.findIndex(row =>
+                                row.some(cell => String(cell).includes('Nombre completo') || String(cell).includes('Marca temporal'))
+                            );
+                            if (headerRowIndex === -1) headerRowIndex = 0;
+
+                            const headers = results.data[headerRowIndex];
+                            const rows = results.data.slice(headerRowIndex + 1).map(row => {
+                                const obj = {};
+                                headers.forEach((h, i) => {
+                                    if (h) obj[h.trim()] = row[i];
+                                });
+                                return obj;
+                            });
+
+                            STATE.rawLeadsData = rows;
+                            STATE.leadsLoaded = true;
+                            console.log('✅ Leads cargados vía Proxy:', rows.length, 'filas');
+                            resolve();
+                        } else {
+                            reject(new Error('Datos inválidos tras proxy'));
+                        }
                     },
                     error(err) { reject(err); }
                 });
             });
             updatePublicityUI();
         } catch (proxyErr) {
-            console.error('Error total en la carga de leads:', proxyErr);
-            alert('No se pudo cargar el listado de leads desde Google Sheets.\n\nVerifica que en Google Sheets:\n1. Has ido a "Publicar en la web".\n2. Has seleccionado la pestaña correcta.\n3. El formato es CSV.');
+            console.error('Error FATAL cargando leads:', proxyErr);
+            alert('ERROR CRÍTICO: No se puede acceder a los leads de Google Sheets.\n\nPOR FAVOR, VERIFICA:\n1. Abre el Excel original.\n2. Archivo -> Compartir -> Publicar en la web.\n3. Asegúrate de que pone "Toda la página" (o la pestaña de Leads) y "Valores separados por comas (.csv)".\n4. Dale al botón "Publicar" (o "Detener publicación" y vuelve a darle).');
         }
     } finally {
         if (loadingEl) loadingEl.classList.add('hidden');
