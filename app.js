@@ -266,6 +266,10 @@ function initNavigation() {
 
                     const newRowData = { ...oldRow };
 
+                    // Clean payload: remove Supabase protected keys that shouldn't be part of update content
+                    delete newRowData.id;
+                    delete newRowData.created_at;
+
                     // Carefully map the UI over the existing keys
                     if ('Marca temporal' in newRowData) newRowData['Marca temporal'] = formattedDate;
                     if ('Fecha de compra' in newRowData) newRowData['Fecha de compra'] = formattedDate;
@@ -348,11 +352,11 @@ function initNavigation() {
                 formSale.reset();
                 document.getElementById('edit-sale-id').value = '';
 
-                // Refetch
-                fetchSupabaseData();
+                // Refetch and wait
+                await fetchSupabaseData();
             } catch (err) {
                 console.error('Error saving sale:', err);
-                alert('Error al guardar la operación. Por favor revisa la conexión o la base de datos Supabase.');
+                alert('Ocurrió un error al guardar la operación. Por favor revisa la consola.');
             } finally {
                 btnSubmit.textContent = originalText;
                 btnSubmit.disabled = false;
@@ -390,6 +394,10 @@ window.openEditModal = function (id) {
     const setSelectSafe = (id, val) => {
         const el = document.getElementById(id);
         if (!el) return;
+        if (!el.options) {
+            el.value = val || '';
+            return;
+        }
         const opts = Array.from(el.options).map(o => o.value);
         if (opts.includes(val)) el.value = val;
     };
@@ -411,7 +419,7 @@ window.openEditModal = function (id) {
 
     // Parse amount back to native number float
     let valStr = row['Valor de compra TOTAL (independientemente de que pague mensual)'] || row['Ticket total'] || '0';
-    valStr = valStr.replace('€', '').trim().replace(',', '.');
+    valStr = String(valStr).replace('€', '').trim().replace(',', '.');
     document.getElementById('sale-amount').value = parseFloat(valStr) || 0;
 
     setSelectSafe('sale-renewal', row['Renovación'] || row['Es una renovación?']);
