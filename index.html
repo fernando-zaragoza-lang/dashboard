@@ -147,144 +147,6 @@
                     </button>
                 </header>
 
-                <div id="new-sale-modal" class="modal-overlay hidden">
-                    <div class="modal-content">
-                        <div class="modal-header">
-                            <h3 id="modal-sale-title">Registrar Nueva Operación</h3>
-                            <button class="close-modal" id="btn-close-sale">×</button>
-                        </div>
-                        <form id="new-sale-form" class="sale-form">
-                            <input type="hidden" id="edit-sale-id">
-                            <div class="form-grid">
-                                <div class="input-group">
-                                    <label>Fecha de Venta (y Hora)</label>
-                                    <input type="datetime-local" id="sale-date" required>
-                                </div>
-                                <div class="input-group">
-                                    <label>Vendedor</label>
-                                    <select id="sale-vendor" required>
-                                        <option value="">Seleccione Vendedor</option>
-                                        <option value="Fer">Fer</option>
-                                        <option value="Josema">Josema</option>
-                                        <option value="Álvaro">Álvaro</option>
-                                        <option value="Javi">Javi</option>
-                                        <option value="Publicidad">Publicidad</option>
-                                        <option value="Campaña">Campaña</option>
-                                        <option value="Otros">Otros</option>
-                                    </select>
-                                </div>
-                                <div class="input-group">
-                                    <label>Email del Cliente</label>
-                                    <input type="email" id="sale-email" placeholder="Ej. juanperez@gmail.com">
-                                </div>
-                                <div class="input-group">
-                                    <label>Nombre y Apellidos del Cliente</label>
-                                    <input type="text" id="sale-client" placeholder="Ej. Juan Pérez" required>
-                                </div>
-                                <div class="input-group full-width">
-                                    <label>Producto o Servicio (Puedes marcar varios)</label>
-                                    <div class="checkbox-grid" id="sale-product-grid"
-                                        style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; background-color: rgba(30, 25, 70, 0.5); padding: 15px; border-radius: var(--radius-sm); border: 1px solid var(--border);">
-                                        <label><input type="checkbox" name="product-option" value="SAS Meeting IT"> SAS
-                                            Meeting IT</label>
-                                        <label><input type="checkbox" name="product-option" value="SAS Meeting Madrid">
-                                            SAS Meeting Madrid</label>
-                                        <label><input type="checkbox" name="product-option" value="Sun&Fun">
-                                            Sun&Fun</label>
-                                        <label><input type="checkbox" name="product-option"
-                                                value="Método SAS/SAS Method"> Método SAS / SAS Method</label>
-                                        <label><input type="checkbox" name="product-option" value="Peer to peer IT">
-                                            Peer to peer IT</label>
-                                        <label><input type="checkbox" name="product-option"
-                                                value="Biomecánica / Método Regular / Regular Method"> Biomecánica /
-                                            Regular Method</label>
-                                        <label><input type="checkbox" name="product-option" value="TPS"> TPS</label>
-                                        <label><input type="checkbox" name="product-option"
-                                                value="Allineatori e Biomeccanica"> Allineatori e Biomeccanica</label>
-                                        <label><input type="checkbox" name="product-option" value="RNO"> RNO</label>
-                                        <label><input type="checkbox" name="product-option" value="In-office">
-                                            In-office</label>
-                                        <label><input type="checkbox" name="product-option" value="Pack Sesiones 1:1">
-                                            Pack Sesiones 1:1</label>
-                                        <label><input type="checkbox" name="product-option" value="SAS Club"> SAS
-                                            Club</label>
-                                    </div>
-                                </div>
-                                <div class="input-group">
-                                    <label>Importe Cobrado (€)</label>
-                                    <input type="number" id="sale-amount" step="0.01" placeholder="Ej. 14.99" required>
-                                </div>
-                                <div class="input-group">
-                                    <label>Es una renovación?</label>
-                                    <select id="sale-renewal">
-                                        <option value="No">No</option>
-                                        <option value="Sí">Sí</option>
-                                    </select>
-                                </div>
-                                <div class="input-group">
-                                    <label>En qué país vive?</label>
-                                    <select id="sale-country">
-                                        <option value="">Seleccione país</option>
-                                        <option value="España">España</option>
-                                        <option value="Argentina">Argentina</option>
-                                        <option value="Bolivia">Bolivia</option>
-                                        <option value="Chile">Chile</option>
-                                        <option value="Colombia">Colombia</option>
-                                        <option value="Costa Rica">Costa Rica</option>
-                                        <option value="Cuba">Cuba</option>
-                                        <option value="Ecuador">Ecuador</option>
-                                        <option value="El Salvador">El Salvador</option>
-                                        <option value="Guatemala">Guatemala</option>
-                                        <option value="Honduras">Honduras</option>
-                                        <option value="México">México</option>
-                                        <option value="Nicaragua">Nicaragua</option>
-                                        <option value="Panamá">Panamá</option>
-                                        <option value="Paraguay">Paraguay</option>
-                                        <option value="Perú">Perú</option>
-                                        <option value="Puerto Rico">Puerto Rico</option>
-                                        <option value="República Dominicana">República Dominicana</option>
-                                        <option value="Uruguay">Uruguay</option>
-                                        <option value="Venezuela">Venezuela</option>
-                                        <option value="Estados Unidos">Estados Unidos</option>
-                                        <option value="Italia">Italia</option>
-                                        <option value="Portugal">Portugal</option>
-                                        <option value="Reino Unido">Reino Unido</option>
-                                        <option value="Francia">Francia</option>
-                                        <option value="Alemania">Alemania</option>
-                                        <option value="Andorra">Andorra</option>
-                                        <option value="Suiza">Suiza</option>
-                                        <option value="Otro">Otro País</option>
-                                    </select>
-                                </div>
-                                <div class="input-group">
-                                    <label>Idioma</label>
-                                    <select id="sale-language">
-                                        <option value="">Seleccione idioma</option>
-                                        <option value="Español">Español</option>
-                                        <option value="Inglés">Inglés</option>
-                                        <option value="Italiano">Italiano</option>
-                                        <option value="Otro">Otro</option>
-                                    </select>
-                                </div>
-                                <div class="input-group">
-                                    <label>Forma de pago</label>
-                                    <select id="sale-payment-method">
-                                        <option value="Transferencia">Transferencia</option>
-                                        <option value="Kajabi">Kajabi</option>
-                                        <option value="Stripe">Stripe</option>
-                                    </select>
-                                </div>
-                                <div class="input-group full-width">
-                                    <label>Qué se le promete al cliente (Anotaciones)</label>
-                                    <textarea id="sale-promise" rows="3"
-                                        placeholder="Ej. Acceso a plataforma hasta 2027..."
-                                        style="background-color: rgba(30, 25, 70, 0.5); border: 1px solid var(--border); color: var(--text-main); padding: 12px 15px; border-radius: var(--radius-sm); font-family: inherit; font-size: 0.95rem;"></textarea>
-                                </div>
-                            </div>
-                            <button type="submit" class="submit-btn" id="btn-submit-sale">Guardar Operación</button>
-                        </form>
-                    </div>
-                </div>
 
                 <div class="kpi-grid">
                     <div class="kpi-card">
@@ -431,6 +293,145 @@
             </div>
 
         </main>
+    </div>
+
+    <!-- Global Modal placed completely outside the container to avoid z-index / CSS transform clipping issues -->
+    <div id="new-sale-modal" class="modal-overlay hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="modal-sale-title">Registrar Nueva Operación</h3>
+                <button class="close-modal" id="btn-close-sale">×</button>
+            </div>
+            <form id="new-sale-form" class="sale-form">
+                <input type="hidden" id="edit-sale-id">
+                <div class="form-grid">
+                    <div class="input-group">
+                        <label>Fecha de Venta (y Hora)</label>
+                        <input type="datetime-local" id="sale-date" required>
+                    </div>
+                    <div class="input-group">
+                        <label>Vendedor</label>
+                        <select id="sale-vendor" required>
+                            <option value="">Seleccione Vendedor</option>
+                            <option value="Fer">Fer</option>
+                            <option value="Josema">Josema</option>
+                            <option value="Álvaro">Álvaro</option>
+                            <option value="Javi">Javi</option>
+                            <option value="Publicidad">Publicidad</option>
+                            <option value="Campaña">Campaña</option>
+                            <option value="Otros">Otros</option>
+                        </select>
+                    </div>
+                    <div class="input-group">
+                        <label>Email del Cliente</label>
+                        <input type="email" id="sale-email" placeholder="Ej. juanperez@gmail.com">
+                    </div>
+                    <div class="input-group">
+                        <label>Nombre y Apellidos del Cliente</label>
+                        <input type="text" id="sale-client" placeholder="Ej. Juan Pérez" required>
+                    </div>
+                    <div class="input-group full-width">
+                        <label>Producto o Servicio (Puedes marcar varios)</label>
+                        <div class="checkbox-grid" id="sale-product-grid"
+                            style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; background-color: rgba(30, 25, 70, 0.5); padding: 15px; border-radius: var(--radius-sm); border: 1px solid var(--border);">
+                            <label><input type="checkbox" name="product-option" value="SAS Meeting IT"> SAS
+                                Meeting IT</label>
+                            <label><input type="checkbox" name="product-option" value="SAS Meeting Madrid">
+                                SAS Meeting Madrid</label>
+                            <label><input type="checkbox" name="product-option" value="Sun&Fun">
+                                Sun&Fun</label>
+                            <label><input type="checkbox" name="product-option" value="Método SAS/SAS Method"> Método
+                                SAS / SAS Method</label>
+                            <label><input type="checkbox" name="product-option" value="Peer to peer IT">
+                                Peer to peer IT</label>
+                            <label><input type="checkbox" name="product-option"
+                                    value="Biomecánica / Método Regular / Regular Method"> Biomecánica /
+                                Regular Method</label>
+                            <label><input type="checkbox" name="product-option" value="TPS"> TPS</label>
+                            <label><input type="checkbox" name="product-option" value="Allineatori e Biomeccanica">
+                                Allineatori e Biomeccanica</label>
+                            <label><input type="checkbox" name="product-option" value="RNO"> RNO</label>
+                            <label><input type="checkbox" name="product-option" value="In-office">
+                                In-office</label>
+                            <label><input type="checkbox" name="product-option" value="Pack Sesiones 1:1">
+                                Pack Sesiones 1:1</label>
+                            <label><input type="checkbox" name="product-option" value="SAS Club"> SAS
+                                Club</label>
+                        </div>
+                    </div>
+                    <div class="input-group">
+                        <label>Importe Cobrado (€)</label>
+                        <input type="number" id="sale-amount" step="0.01" placeholder="Ej. 14.99" required>
+                    </div>
+                    <div class="input-group">
+                        <label>Es una renovación?</label>
+                        <select id="sale-renewal">
+                            <option value="No">No</option>
+                            <option value="Sí">Sí</option>
+                        </select>
+                    </div>
+                    <div class="input-group">
+                        <label>En qué país vive?</label>
+                        <select id="sale-country">
+                            <option value="">Seleccione país</option>
+                            <option value="España">España</option>
+                            <option value="Argentina">Argentina</option>
+                            <option value="Bolivia">Bolivia</option>
+                            <option value="Chile">Chile</option>
+                            <option value="Colombia">Colombia</option>
+                            <option value="Costa Rica">Costa Rica</option>
+                            <option value="Cuba">Cuba</option>
+                            <option value="Ecuador">Ecuador</option>
+                            <option value="El Salvador">El Salvador</option>
+                            <option value="Guatemala">Guatemala</option>
+                            <option value="Honduras">Honduras</option>
+                            <option value="México">México</option>
+                            <option value="Nicaragua">Nicaragua</option>
+                            <option value="Panamá">Panamá</option>
+                            <option value="Paraguay">Paraguay</option>
+                            <option value="Perú">Perú</option>
+                            <option value="Puerto Rico">Puerto Rico</option>
+                            <option value="República Dominicana">República Dominicana</option>
+                            <option value="Uruguay">Uruguay</option>
+                            <option value="Venezuela">Venezuela</option>
+                            <option value="Estados Unidos">Estados Unidos</option>
+                            <option value="Italia">Italia</option>
+                            <option value="Portugal">Portugal</option>
+                            <option value="Reino Unido">Reino Unido</option>
+                            <option value="Francia">Francia</option>
+                            <option value="Alemania">Alemania</option>
+                            <option value="Andorra">Andorra</option>
+                            <option value="Suiza">Suiza</option>
+                            <option value="Otro">Otro País</option>
+                        </select>
+                    </div>
+                    <div class="input-group">
+                        <label>Idioma</label>
+                        <select id="sale-language">
+                            <option value="">Seleccione idioma</option>
+                            <option value="Español">Español</option>
+                            <option value="Inglés">Inglés</option>
+                            <option value="Italiano">Italiano</option>
+                            <option value="Otro">Otro</option>
+                        </select>
+                    </div>
+                    <div class="input-group">
+                        <label>Forma de pago</label>
+                        <select id="sale-payment-method">
+                            <option value="Transferencia">Transferencia</option>
+                            <option value="Kajabi">Kajabi</option>
+                            <option value="Stripe">Stripe</option>
+                        </select>
+                    </div>
+                    <div class="input-group full-width">
+                        <label>Qué se le promete al cliente (Anotaciones)</label>
+                        <textarea id="sale-promise" rows="3" placeholder="Ej. Acceso a plataforma hasta 2027..."
+                            style="background-color: rgba(30, 25, 70, 0.5); border: 1px solid var(--border); color: var(--text-main); padding: 12px 15px; border-radius: var(--radius-sm); font-family: inherit; font-size: 0.95rem;"></textarea>
+                    </div>
+                </div>
+                <button type="submit" class="submit-btn" id="btn-submit-sale">Guardar Operación</button>
+            </form>
+        </div>
     </div>
 
     <!-- Supabase SDK -->
