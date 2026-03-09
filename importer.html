@@ -3,7 +3,8 @@
 
 <head>
     <meta charset="UTF-8">
-    <title>SAS - Importador CSV → Supabase</title>
+    <title>Dashboard SAS - Importador</title>
+    <link rel="icon" href="logosimbolo_sas.png" type="image/png">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
@@ -62,6 +63,13 @@
             cursor: not-allowed;
         }
 
+        .btn-danger {
+            background: #ef4444;
+            margin-top: 10px;
+            font-size: 0.85rem;
+            padding: 10px;
+        }
+
         #log {
             background: #0a0819;
             border-radius: 8px;
@@ -109,6 +117,7 @@
 
         <button id="btnImport" disabled>🚀 Importar a Supabase</button>
         <progress id="prog" value="0" max="100" style="display:none"></progress>
+        <button id="btnDeleteAll" class="btn-danger">🗑️ Borrar Todo (Limpiar Base de Datos)</button>
     </div>
 
     <div class="card">
@@ -143,7 +152,7 @@
         // We store them in Supabase under the exact same column names.
         function mapRow(row) {
             // Try multiple possible header names for robustness
-            const fecha = row['Marca temporal'] || row['Fecha de compra'] || row['Timestamp'] || '';
+            const fecha = row['Fecha de compra'] || row['Marca temporal'] || row['Timestamp'] || '';
             const vendor = row['Vendedor'] || row['vendedor'] || '';
             const client = row['Nombre completo'] || row['Nombre'] || row['nombre completo'] || '';
             const product = row['Qué compra?'] || row['Que compra?'] || row['Producto'] || row['producto'] || row['What are you buying?'] || '';
@@ -178,6 +187,7 @@
 
             return {
                 'Marca temporal': fecha,
+                'Fecha de compra': row['Fecha de compra'] || fecha,
                 'Vendedor': vendor,
                 'Nombre completo': client,
                 'Email': email.trim().toLowerCase(),
@@ -265,8 +275,22 @@
                 return null;
             }
             if (!data || data.length === 0) {
-                log("⚠️ La tabla está vacía o no se puede leer. Usando nombres por defecto.");
-                return null;
+                log("⚠️ La tabla está vacía o no se puede leer. Usando listado de columnas de respaldo.");
+                // Fallback list of exact Supabase column names
+                return [
+                    'id',
+                    'Marca temporal',
+                    'Vendedor',
+                    'Nombre completo',
+                    'Email',
+                    'Qué compra?',
+                    'Valor de compra TOTAL (independientemente de que pague mensual)',
+                    'Es una renovación?',
+                    'En qué país vive?',
+                    'Idioma',
+                    'Forma de pago',
+                    'Qué se le promete al cliente'
+                ];
             }
             const keys = Object.keys(data[0]);
             log(`✅ Columnas detectadas en Supabase: ${keys.join(', ')}`, 'ok');
@@ -371,6 +395,37 @@
             log(`¡Listo! Ahora abre index.html y refresca los datos.`, 'ok');
 
             btnImp.disabled = false;
+        });
+
+        // ── Delete All button ──────────────────────────────────────────
+        document.getElementById('btnDeleteAll').addEventListener('click', async () => {
+            const confirm1 = confirm("⚠️ ¿ESTÁS SEGURO? Esto borrará TODAS las ventas de la base de datos de Supabase.");
+            if (!confirm1) return;
+            const confirm2 = confirm("🛑 ÚLTIMO AVISO: Esta acción es irreversible. ¿Realmente quieres borrar todo?");
+            if (!confirm2) return;
+
+            try {
+                const btnDel = document.getElementById('btnDeleteAll');
+                btnDel.disabled = true;
+                btnDel.textContent = "Borrando...";
+
+                // Supabase delete all (requires a filter that matches everything)
+                // Use a numeric filter since the ID is bigint
+                const { error } = await db.from('ventas').delete().gt('id', 0);
+
+                if (error) throw error;
+
+                clearLog();
+                log("✅ Base de datos vaciada correctamente.", "ok");
+                alert("Base de datos limpia. Ya puedes importar el archivo nuevo.");
+            } catch (err) {
+                log(`❌ Error al borrar: ${err.message}`, "err");
+                alert("Error al borrar: " + err.message);
+            } finally {
+                const btnDel = document.getElementById('btnDeleteAll');
+                btnDel.disabled = false;
+                btnDel.textContent = "🗑️ Borrar Todo (Limpiar Base de Datos)";
+            }
         });
     </script>
 </body>
