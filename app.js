@@ -706,8 +706,8 @@ function processNuevosData(data) {
             }
         }
 
-        // Cycles (Marca temporal)
-        const cycle = getSalesCycle(row['Marca temporal']);
+        // Cycles (Fecha de compra prioritized via getDateStr)
+        const cycle = getSalesCycle(getDateStr(row));
         if (cycle) uniqueCycles.add(cycle);
 
         // Vendors
@@ -1081,8 +1081,8 @@ function updateVendorUI() {
         // Filter by vendor
         if (STATE.selectedVendor !== 'all' && normalizedSeller !== STATE.selectedVendor) return;
 
-        // 2. Filter by Cycle
-        const cycle = getSalesCycle(row['Marca temporal']);
+        // 2. Filter by Cycle (Fecha de compra prioritized via getDateStr)
+        const cycle = getSalesCycle(getDateStr(row));
         if (STATE.selectedCycle !== 'all' && cycle !== STATE.selectedCycle) return;
 
         // Extract Sale Amount (Priority: Valor de compra)
