@@ -661,6 +661,7 @@ function getDateStr(row) {
 
 // Helper: get the product string from a row regardless of encoding
 function getProductStr(row) {
+    // User priority: "Qué compra?" (Column F)
     let raw = row['Qué compra?'] || row['Que compra?'] || row['QuĂ© compra?'] || row['Product'] || row['Producto'];
     if (raw) return raw;
     return getRowValFriendly(row, ['compra', 'product', 'servicio']) || 'Desconocido';
