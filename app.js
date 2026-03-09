@@ -214,15 +214,20 @@ function initNavigation() {
             now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
             document.getElementById('sale-date').value = now.toISOString().slice(0, 16);
             modalSale.classList.remove('hidden');
+            document.body.classList.add('modal-open');
         });
 
         btnCloseSale.addEventListener('click', () => {
             modalSale.classList.add('hidden');
+            document.body.classList.remove('modal-open');
         });
 
         // Close when clicking outside
         modalSale.addEventListener('click', (e) => {
-            if (e.target === modalSale) modalSale.classList.add('hidden');
+            if (e.target === modalSale) {
+                modalSale.classList.add('hidden');
+                document.body.classList.remove('modal-open');
+            }
         });
 
         // Submit new sale to Supabase
@@ -261,7 +266,6 @@ function initNavigation() {
             const editId = document.getElementById('edit-sale-id').value;
 
             try {
-
                 if (editId) {
                     // Build explicit update payload using exact Supabase column names
                     const updatePayload = {
@@ -329,11 +333,12 @@ function initNavigation() {
                 }
 
                 modalSale.classList.add('hidden');
+                document.body.classList.remove('modal-open');
                 formSale.reset();
                 document.getElementById('edit-sale-id').value = '';
 
-                // Refetch and wait
-                await fetchSupabaseData();
+                // Refetch without blocking (async call but not awaited here to avoid UI hang)
+                fetchSupabaseData();
             } catch (err) {
                 console.error('--- DETAILED ERROR LOG ---');
                 console.error('Context:', editId ? `Edición ID ${editId}` : 'Nueva Inserción');
@@ -434,7 +439,9 @@ window.openEditModal = function (id) {
     document.getElementById('sale-promise').value = row['Promesa'] || row['Qué se le promete al cliente'] || '';
 
     document.getElementById('new-sale-modal').classList.remove('hidden');
+    document.body.classList.add('modal-open');
 };
+
 
 function initSearch() {
     // Removed
@@ -646,9 +653,10 @@ function getRowValFriendly(row, keywords) {
 
 // Helper: get the date string from a row regardless of column name (CSV vs Supabase)
 function getDateStr(row) {
-    let raw = row['Marca temporal'] || row['Fecha de compra'] || row['Timestamp'] || row['created_at'];
+    // User priority: "Fecha de compra" (Column N)
+    let raw = row['Fecha de compra'] || row['Marca temporal'] || row['Timestamp'] || row['created_at'];
     if (raw) return raw;
-    return getRowValFriendly(row, ['marca temporal', 'fecha', 'timestamp', 'date', 'created_at']) || '';
+    return getRowValFriendly(row, ['fecha de compra', 'marca temporal', 'fecha', 'timestamp', 'date', 'created_at']) || '';
 }
 
 // Helper: get the product string from a row regardless of encoding
@@ -911,11 +919,11 @@ function aggregateNuevosData(data) {
         if (STATE.selectedYear !== 'all' && saleYear !== STATE.selectedYear) return;
         if (STATE.selectedMonth !== 'all' && saleMonth !== STATE.selectedMonth) return;
 
-        // Sales Amount (try fuzzy matching if exact fails)
-        let valStr = row['Ticket total'] || row['Valor de compra TOTAL (independientemente de que pague mensual)'];
+        // Sales Amount (User priority: "Valor de compra" (Column L))
+        let valStr = row['Valor de compra'] || row['Ticket total'] || row['Valor de compra TOTAL (independientemente de que pague mensual)'];
 
         if (valStr === undefined || valStr === null || String(valStr).trim() === '' || String(valStr).trim() === '0,00 €' || String(valStr).trim() === '0,00 \'') {
-            valStr = getRowValFriendly(row, ['ticket', 'total', 'valor', 'importe', 'compra total']) || '';
+            valStr = getRowValFriendly(row, ['valor de compra', 'ticket', 'total', 'valor', 'importe', 'compra total']) || '';
         }
 
         const saleAmount = parseEuroValue(valStr);
@@ -929,12 +937,17 @@ function aggregateNuevosData(data) {
         // Seller
         const seller = sanitizeString(row['Vendedor']);
 
-        // Product
-        let product = sanitizeString(getProductStr(row));
-
-        if (product && product !== 'Desconocido') {
-            STATE.totalUnits++;
-            STATE.unitsByProduct[product] = (STATE.unitsByProduct[product] || 0) + 1;
+        // Product (User fix: Split by comma to count each unit individually)
+        const productVal = getProductStr(row);
+        if (productVal && productVal !== 'Desconocido') {
+            const products = String(productVal).split(',').map(p => p.trim()).filter(p => p !== '');
+            products.forEach(p => {
+                const cleanP = sanitizeString(p);
+                if (cleanP && cleanP !== 'Desconocido') {
+                    STATE.totalUnits++;
+                    STATE.unitsByProduct[cleanP] = (STATE.unitsByProduct[cleanP] || 0) + 1;
+                }
+            });
         }
 
         // Aggregate Sales
@@ -1072,8 +1085,8 @@ function updateVendorUI() {
         const cycle = getSalesCycle(row['Marca temporal']);
         if (STATE.selectedCycle !== 'all' && cycle !== STATE.selectedCycle) return;
 
-        // Extract Sale Amount
-        let valStr = row['Valor de compra TOTAL (independientemente de que pague mensual)'];
+        // Extract Sale Amount (Priority: Valor de compra)
+        let valStr = row['Valor de compra'] || row['Valor de compra TOTAL (independientemente de que pague mensual)'];
         if (!valStr || valStr.trim() === '' || valStr.trim() === '0,00 €' || valStr.trim() === '0,00\'') {
             valStr = row['Ticket total'];
         }
@@ -1096,7 +1109,7 @@ function updateVendorUI() {
         const tr = document.createElement('tr');
 
         const tdDate = document.createElement('td');
-        tdDate.textContent = row['Marca temporal'] || row['Fecha de compra'] || 'Sin fecha';
+        tdDate.textContent = row['Fecha de compra'] || row['Marca temporal'] || 'Sin fecha';
 
         const tdClient = document.createElement('td');
         tdClient.textContent = sanitizeString(row['Nombre completo']);
