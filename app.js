@@ -1004,11 +1004,20 @@ function aggregateNuevosData(data) {
         STATE.salesByDay[dayKey] = (STATE.salesByDay[dayKey] || 0) + saleAmount;
 
         if (saleAmount > 0) {
-            let normalizedSeller = seller.toLowerCase();
-            if (normalizedSeller.includes('publi')) normalizedSeller = 'Publicidad';
-            else if (normalizedSeller.includes('calendario') || normalizedSeller.includes('campa')) normalizedSeller = 'Campaña';
-            else if (seller === '') normalizedSeller = 'Otros';
-            else normalizedSeller = seller.charAt(0).toUpperCase() + seller.slice(1);
+            let normalizedSeller = seller.toLowerCase().trim();
+            const allowedSellers = ['javi', 'alvaro', 'josema', 'fer'];
+
+            // Clean accents for matching
+            const checkSeller = normalizedSeller.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+
+            if (allowedSellers.includes(checkSeller)) {
+                // Capitalize first letter for display
+                normalizedSeller = seller.charAt(0).toUpperCase() + seller.slice(1).toLowerCase();
+                // Fix accent for Álvaro if needed
+                if (checkSeller === 'alvaro') normalizedSeller = 'Álvaro';
+            } else {
+                normalizedSeller = 'Otros';
+            }
 
             STATE.salesBySeller[normalizedSeller] = (STATE.salesBySeller[normalizedSeller] || 0) + saleAmount;
         }
