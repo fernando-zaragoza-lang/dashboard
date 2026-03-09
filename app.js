@@ -667,6 +667,38 @@ function getProductStr(row) {
     return getRowValFriendly(row, ['compra', 'product', 'servicio']) || 'Desconocido';
 }
 
+/**
+ * Normalizes encoding issues (MǸtodo, Milǭn) and classifies into user-defined categories.
+ */
+function normalizeAndClassifyProduct(str) {
+    if (!str || str === 'Desconocido') return 'Otros';
+
+    // Fix encoding artifacts
+    let p = String(str)
+        .replace(/MǸtodo/g, 'Método')
+        .replace(/Milǭn/g, 'Milán')
+        .replace(/QuǸ/g, 'Qué')
+        .replace(/Biomecǭnica/g, 'Biomecánica')
+        .normalize('NFD').replace(/[\u0300-\u036f]/g, '') // Remove accents for matching
+        .toLowerCase();
+
+    if (p.includes('metodo sas') || p.includes('sas method')) return 'Método SAS';
+    if (p.includes('sun&fun') || p.includes('sun and fun')) return 'Sun&Fun';
+    if (p.includes('milan')) return 'SAS Meeting Milán';
+    if (p.includes('madrid')) return 'SAS Meeting Madrid';
+    if (p.includes('peer to peer')) return 'Peer to peer IT';
+    if (p.includes('biomecanica') || p.includes('biomeccanica')) return 'Biomecánica';
+    if (p.includes('tps')) return 'TPS';
+    if (p.includes('rno')) return 'RNO';
+    if (p.includes('sas club')) return 'SAS Club';
+    if (p.includes('allineatori')) return 'Allineatori e Biomeccanica';
+    if (p.includes('pack sesiones')) return 'Pack Sesiones 1:1';
+    if (p.includes('in-office')) return 'In-office';
+    if (p.includes('metodo regular') || p.includes('regular method')) return 'Método SAS'; // Classified as SAS Method per user list
+
+    return 'Otros / Consultoría';
+}
+
 function processNuevosData(data) {
     console.log("Processing Nuevos (Sales) Data", data.length, "rows");
 
@@ -952,8 +984,8 @@ function aggregateNuevosData(data) {
         if (productVal && productVal !== 'Desconocido') {
             const products = String(productVal).split(',').map(p => p.trim()).filter(p => p !== '');
             products.forEach(p => {
-                const cleanP = sanitizeString(p);
-                if (cleanP && cleanP !== 'Desconocido') {
+                const cleanP = normalizeAndClassifyProduct(p);
+                if (cleanP && cleanP !== 'Otros') {
                     STATE.totalUnits++;
                     STATE.unitsByProduct[cleanP] = (STATE.unitsByProduct[cleanP] || 0) + 1;
                 }
@@ -1342,24 +1374,10 @@ function renderSalesBySellerChart() {
 function renderUnitsByProductChart() {
     const ctx = document.getElementById('unitsByProductChart').getContext('2d');
 
-    // Group similar products to avoid too many slices
-    let groupedObj = {};
-    for (const [prod, count] of Object.entries(STATE.unitsByProduct)) {
-        let cat = 'Otros';
-        const pLow = prod.toLowerCase();
+    // Sort by unit count descending
+    const sortedGroups = Object.entries(STATE.unitsByProduct)
+        .sort((a, b) => b[1] - a[1]);
 
-        if (pLow.includes('método') || pLow.includes('metodo')) cat = 'Método SAS';
-        else if (pLow.includes('valencia') || pLow.includes('sun&fun')) cat = 'Evento Valencia';
-        else if (pLow.includes('madrid') || pLow.includes('milán') || pLow.includes('milan')) cat = 'Eventos Presenciales';
-        else if (pLow.includes('tps') || pLow.includes('pack')) cat = 'TPS / Packs';
-        else if (pLow.includes('peer') || pLow.includes('biomecánica') || pLow.includes('biomeccanica')) cat = 'Peer to Peer / Biomecánica';
-        else if (pLow.includes('rno')) cat = 'RNO';
-        else cat = 'Otros / Consultoría';
-
-        groupedObj[cat] = (groupedObj[cat] || 0) + count;
-    }
-
-    const sortedGroups = Object.entries(groupedObj).sort((a, b) => b[1] - a[1]);
     const labels = sortedGroups.map(item => item[0]);
     const dataObj = sortedGroups.map(item => item[1]);
 
