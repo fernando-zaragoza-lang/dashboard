@@ -870,6 +870,7 @@ function populateMonthDropdown(months) {
 function aggregateNuevosData(data) {
     // Reset state
     STATE.salesByMonth = {};
+    STATE.salesByDay = {}; // New state for daily breakdown
     STATE.salesBySeller = {};
     STATE.unitsByProduct = {};
     STATE.totalSales = 0;
@@ -883,7 +884,9 @@ function aggregateNuevosData(data) {
         // Extract month/year for grouping
         let saleYear = null;
         let saleMonth = null;
+        let saleDay = null; // New variable for day extraction
         let monthKey = 'Sin fecha';
+        let dayKey = 'Sin fecha';
 
         // Handle ISO dates from DB (e.g. 2025-06-18T15:30:00Z) vs normal CSV (18/06/2025)
         if (dateStr.includes('T') && dateStr.includes('-')) {
@@ -891,7 +894,9 @@ function aggregateNuevosData(data) {
             if (!isNaN(d.getTime())) {
                 saleYear = d.getFullYear().toString();
                 saleMonth = String(d.getMonth() + 1).padStart(2, '0');
+                saleDay = String(d.getDate()).padStart(2, '0');
                 monthKey = `${saleYear}-${saleMonth}`;
+                dayKey = `${saleYear}-${saleMonth}-${saleDay}`;
             }
         }
         // Handle YYYY-MM-DD
@@ -899,18 +904,22 @@ function aggregateNuevosData(data) {
             const parts = dateStr.split('-');
             saleYear = parts[0];
             saleMonth = parts[1];
+            saleDay = parts[2].split(' ')[0].trim(); // Remove time if present
             monthKey = `${saleYear}-${saleMonth}`;
+            dayKey = `${saleYear}-${saleMonth}-${saleDay.padStart(2, '0')}`;
         }
         // Handle DD/MM/YYYY
         else {
             const parts = dateStr.split(/[\/\-]/);
             if (parts.length >= 2) {
+                saleDay = parts[0].padStart(2, '0');
                 saleMonth = parts[1].padStart(2, '0');
                 const yRaw = parts.length === 3 ? parts[2] : '2025';
                 saleYear = yRaw.split(' ')[0].trim(); // Remove time if present
 
                 if (/^\d{4}$/.test(saleYear) && /^\d{2}$/.test(saleMonth)) {
                     monthKey = `${saleYear}-${saleMonth}`;
+                    dayKey = `${saleYear}-${saleMonth}-${saleDay}`;
                 }
             }
         }
@@ -950,10 +959,16 @@ function aggregateNuevosData(data) {
             });
         }
 
+        // Debug March 2026 data
+        if (saleMonth === '03' && saleYear === '2026') {
+            console.log(`MARCH 2026 ROW: Date=${dateStr} | Product=${productVal} | Value=${valStr} -> ${saleAmount}€ | Seller=${seller}`);
+        }
+
         // Aggregate Sales
         STATE.totalSales += saleAmount;
 
         STATE.salesByMonth[monthKey] = (STATE.salesByMonth[monthKey] || 0) + saleAmount;
+        STATE.salesByDay[dayKey] = (STATE.salesByDay[dayKey] || 0) + saleAmount;
 
         if (saleAmount > 0) {
             let normalizedSeller = seller.toLowerCase();
@@ -1167,18 +1182,46 @@ function getGradient(ctx, color1, color2) {
 
 function renderSalesByMonthChart() {
     const ctx = document.getElementById('salesByMonthChart').getContext('2d');
+    const titleEl = document.getElementById('salesChartTitle');
 
-    // Sort keys chronologically
-    const labels = Object.keys(STATE.salesByMonth).sort();
-    const dataObj = labels.map(k => STATE.salesByMonth[k]);
+    let labels, dataObj, formattedLabels;
+    let isDaily = STATE.selectedMonth !== 'all';
 
-    // Format labels nicely (e.g., 2025-07 -> Jul 2025)
-    const formattedLabels = labels.map(l => {
-        if (l === 'Sin fecha') return l;
-        const [y, m] = l.split('-');
-        const date = new Date(y, parseInt(m) - 1, 1);
-        return date.toLocaleDateString('es-ES', { month: 'short', year: 'numeric' });
-    });
+    if (isDaily) {
+        if (titleEl) titleEl.textContent = 'Evolución de Ventas por Día';
+
+        // Filter keys for current year/month
+        const filteredKeys = Object.keys(STATE.salesByDay).filter(k => {
+            if (k === 'Sin fecha') return false;
+            const [y, m, d] = k.split('-');
+            const yearMatch = STATE.selectedYear === 'all' || y === STATE.selectedYear;
+            const monthMatch = m === STATE.selectedMonth;
+            return yearMatch && monthMatch;
+        }).sort();
+
+        labels = filteredKeys;
+        dataObj = labels.map(k => STATE.salesByDay[k]);
+
+        // Format labels: YYYY-MM-DD -> DD
+        formattedLabels = labels.map(l => {
+            const parts = l.split('-');
+            return parts.length === 3 ? parts[2] : l;
+        });
+    } else {
+        if (titleEl) titleEl.textContent = 'Evolución de Ventas por Mes';
+
+        // Use monthly state
+        labels = Object.keys(STATE.salesByMonth).sort();
+        dataObj = labels.map(k => STATE.salesByMonth[k]);
+
+        // Format labels: YYYY-MM -> MMM YYYY
+        formattedLabels = labels.map(l => {
+            if (l === 'Sin fecha') return l;
+            const [y, m] = l.split('-');
+            const date = new Date(y, parseInt(m) - 1, 1);
+            return date.toLocaleDateString('es-ES', { month: 'short', year: 'numeric' });
+        });
+    }
 
     if (charts.salesByMonth) charts.salesByMonth.destroy();
 
